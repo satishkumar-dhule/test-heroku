@@ -30,6 +30,30 @@ jobs:
           server-username: GITHUB_ACTOR
           server-password: GH_TOKEN
 
+      - name: Verify Maven Settings
+        run: |
+          echo "Checking ~/.m2/settings.xml content:"
+          mkdir -p ~/.m2
+          cat > ~/.m2/settings.xml << EOF
+          <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                    xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
+                                      http://maven.apache.org/xsd/settings-1.0.0.xsd">
+            <servers>
+              <server>
+                <id>github</id>
+                <username>\${env.GITHUB_ACTOR}</username>
+                <password>\${env.GH_TOKEN}</password>
+              </server>
+            </servers>
+          </settings>
+          EOF
+          echo "Settings.xml content:"
+          cat ~/.m2/settings.xml
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_ACTOR: ${{ secrets.GH_USER }}
+
       - name: Get commit messages
         id: get_commits
         run: |
