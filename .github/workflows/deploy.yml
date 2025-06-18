@@ -12,7 +12,7 @@ jobs:
     environment: production
     permissions:
       contents: read
-      packages: read
+      packages: write
 
     steps:
       - name: Checkout
@@ -28,17 +28,34 @@ jobs:
           server-username: GITHUB_ACTOR
           server-password: GITHUB_TOKEN
 
-      - name: Build and deploy main webapp
+      - name: Build and publish main webapp
         run: |
-          # Build and publish main webapp first
-          mvn clean deploy -DskipTests
+          echo "Current version from pom.xml:"
+          mvn help:evaluate -Dexpression=project.version -q -DforceStdout
           
-          # Build consumer app
+          echo "Publishing to GitHub Packages..."
+          mvn -B clean deploy -DskipTests \
+            -DaltDeploymentRepository=github::default::https://maven.pkg.github.com/${{ github.repository }} \
+            --file pom.xml
+          
+          echo "Verifying published artifact..."
+          mvn dependency:get \
+            -DremoteRepositories=github::default::https://maven.pkg.github.com/${{ github.repository }} \
+            -DgroupId=com.example \
+            -DartifactId=demo-webapp \
+            -Dversion=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout) \
+            -Dpackaging=war \
+            -Dtransitive=false
+          
+          echo "Building consumer app..."
           cd consumer-app
-          mvn clean package -DskipTests
+          mvn -B clean package -DskipTests
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+          MAVEN_USERNAME: ${{ github.actor }}
+          MAVEN_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Deploy to Heroku
         uses: akhileshns/heroku-deploy@v3.12.14
@@ -49,7 +66,18 @@ jobs:
           healthcheck: "https://${{ secrets.HEROKU_APP_NAME }}.herokuapp.com/hello"
           rollbackonhealthcheckfailed: true
           justlogin: false
+          appdir: "."
+          procfile: "web: java $JAVA_OPTS -jar target/dependency/jetty-runner.jar --port $PORT target/demo-webapp.war"
 
       - name: Verify Deployment
         run: |
-          curl -f https://${{ secrets.HEROKU_APP_NAME }}.herokuapp.com/health || exit 1
+          # Give the app a moment to start
+          sleep 10
+          # Try the health endpoint first
+          if curl -f "https://${{ secrets.HEROKU_APP_NAME }}.herokuapp.com/hello"; then
+            echo "Deployment verified successfully"
+            exit 0
+          else
+            echo "Health check failed"
+            exit 1
+          fi
