@@ -203,7 +203,7 @@ $ heroku open
 1. Set up authentication:
    ```bash
    export GITHUB_USERNAME=your-username
-   export GITHUB_TOKEN=your-personal-access-token
+   export GH_TOKEN=your-personal-access-token
    ```
 
 2. Publish:
@@ -392,7 +392,7 @@ jobs:
           distribution: 'temurin'
       - run: mvn deploy
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
 ```
 
 ### 2. Semantic Release (`semantic-release.yml`)
@@ -412,7 +412,7 @@ jobs:
       - run: npm install
       - run: npx semantic-release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
 ```
 
 ### 3. Heroku Deployment (`deploy.yml`)
