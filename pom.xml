@@ -7,7 +7,7 @@
     <groupId>com.example</groupId>
     <artifactId>demo-webapp</artifactId>
     <packaging>war</packaging>
-    <version>1.7.0-SNAPSHOT</version>
+    <version>1.8.0</version>
     <name>Demo Webapp</name>
     <description>A simple web application</description>
 
