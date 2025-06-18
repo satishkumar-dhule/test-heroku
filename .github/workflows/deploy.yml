@@ -18,7 +18,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Java and Maven settings
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
           java-version: '17'
@@ -28,38 +28,16 @@ jobs:
           server-username: GITHUB_ACTOR
           server-password: GITHUB_TOKEN
 
-      - name: Build and publish main webapp
+      - name: Build and deploy main webapp
         run: |
-          # Update the version in both POMs
-          mvn versions:set -DnewVersion=${GITHUB_REF#refs/tags/v} -DprocessAllModules=true -DgenerateBackupPoms=false
-
-          # Build and publish to GitHub Packages
-          mvn --batch-mode clean deploy -DskipTests \
-            -Dmaven.test.skip=true \
-            -DaltDeploymentRepository=github::default::https://maven.pkg.github.com/${{ github.repository }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_ACTOR: ${{ github.actor }}
-          MAVEN_USERNAME: ${{ github.actor }}
-          MAVEN_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build consumer app
-        run: |
-          # Verify the published artifact is available
-          mvn dependency:get \
-            -DremoteRepositories=github::default::https://maven.pkg.github.com/${{ github.repository }} \
-            -DgroupId=com.example \
-            -DartifactId=demo-webapp \
-            -Dversion=${GITHUB_REF#refs/tags/v} \
-            -Dpackaging=war \
-            -Dtransitive=false
-
+          # Build and publish main webapp first
+          mvn clean deploy -DskipTests
+          
           # Build consumer app
           cd consumer-app
-          mvn --batch-mode clean package -DskipTests
+          mvn clean package -DskipTests
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_REPOSITORY: ${{ github.repository }}
 
       - name: Deploy to Heroku

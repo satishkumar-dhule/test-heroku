@@ -5,7 +5,9 @@
   <groupId>com.example</groupId>
   <artifactId>demo-consumer</artifactId>
   <packaging>war</packaging>
+
   <version>1.8.0</version>
+
   <name>Demo Consumer Webapp</name>
   <description>A consumer application using the demo-webapp package</description>
 
@@ -19,13 +21,7 @@
   <repositories>
     <repository>
       <id>github</id>
-      <url>https://maven.pkg.github.com/satishkumar-dhule/test-heroku</url>
-      <snapshots>
-        <enabled>true</enabled>
-      </snapshots>
-      <releases>
-        <enabled>true</enabled>
-      </releases>
+      <url>https://maven.pkg.github.com/${env.GITHUB_REPOSITORY}</url>
     </repository>
   </repositories>
 
