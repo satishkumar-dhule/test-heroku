@@ -7,7 +7,7 @@
     <groupId>com.example</groupId>
     <artifactId>demo-webapp</artifactId>
     <packaging>war</packaging>
-    <version>1.6.0</version>
+    <version>1.7.0</version>
     <name>myapp Maven Webapp</name>
 
     <distributionManagement>
