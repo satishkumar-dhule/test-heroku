@@ -1,4 +1,8 @@
-<?xml     <groupId>com.example</groupId>
+<?xml         <groupId>com.example</groupId>
+    <artifactId>demo-webapp</artifactId>
+    <packaging>war</packaging>
+    <version>1.7.0-SNAPSHOT</version>
+    <name>Demo Webapp</name>mple</groupId>
     <artifactId>demo-webapp</artifactId>
     <packaging>war</packaging>
     <version>1.9.0</version>
@@ -12,12 +16,16 @@
     <artifactId>demo-webapp</artifactId>
     <packaging>war</packaging>
 <<<<<<< HEAD
+<<<<<<< HEAD
 
     <version>1.9.0</version>
 
     <name>myapp Maven Webapp</name>
 =======
     <version>1.6.0</version>
+=======
+    <version>1.7.0-SNAPSHOT</version>
+>>>>>>> 16822e6 (feat: update deployment workflows and POM files for versioning, health checks, and GitHub Packages integration)
     <name>Demo Webapp</name>
 >>>>>>> 077d686 (feat: update pom.xml for GitHub Packages integration and adjust project metadata)
 

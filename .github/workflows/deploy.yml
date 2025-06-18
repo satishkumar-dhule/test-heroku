@@ -66,7 +66,18 @@ jobs:
           healthcheck: "https://${{ secrets.HEROKU_APP_NAME }}.herokuapp.com/hello"
           rollbackonhealthcheckfailed: true
           justlogin: false
+          appdir: "."
+          procfile: "web: java $JAVA_OPTS -jar target/dependency/jetty-runner.jar --port $PORT target/demo-webapp.war"
 
       - name: Verify Deployment
         run: |
-          curl -f https://${{ secrets.HEROKU_APP_NAME }}.herokuapp.com/health || exit 1
+          # Give the app a moment to start
+          sleep 10
+          # Try the health endpoint first
+          if curl -f "https://${{ secrets.HEROKU_APP_NAME }}.herokuapp.com/hello"; then
+            echo "Deployment verified successfully"
+            exit 0
+          else
+            echo "Health check failed"
+            exit 1
+          fi

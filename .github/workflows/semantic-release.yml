@@ -89,15 +89,17 @@ jobs:
           echo "Updating main project version..."
           mvn versions:set -DnewVersion=${{ steps.version.outputs.new_version }} -DgenerateBackupPoms=false
           
+          echo "Building and publishing main webapp..."
+          mvn clean deploy -DskipTests \
+            -DaltDeploymentRepository=github::default::https://maven.pkg.github.com/${{ github.repository }}
+          
           echo "Updating consumer-app version..."
           cd consumer-app
           mvn versions:set -DnewVersion=${{ steps.version.outputs.new_version }} -DgenerateBackupPoms=false
           cd ..
           
-          echo "Checking git status..."
-          git status
-          
-          # Stage all pom.xml changes
+          echo "Staging changes..."
+          git add **/pom.xml
           git add **/pom.xml
           
           echo "Checking git status after staging..."
