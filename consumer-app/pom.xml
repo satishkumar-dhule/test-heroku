@@ -19,7 +19,13 @@
   <repositories>
     <repository>
       <id>github</id>
-      <url>https://maven.pkg.github.com/${env.GITHUB_REPOSITORY}</url>
+      <url>https://maven.pkg.github.com/satishkumar-dhule/test-heroku</url>
+      <snapshots>
+        <enabled>true</enabled>
+      </snapshots>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
     </repository>
   </repositories>
 
