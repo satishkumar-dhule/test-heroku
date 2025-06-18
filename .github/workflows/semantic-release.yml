@@ -95,17 +95,22 @@ jobs:
           git tag -a "v${{ steps.version.outputs.new_version }}" -m "Release v${{ steps.version.outputs.new_version }}"
           git push --follow-tags
 
-      - name: Create release notes
+      - name: Generate and create release
         if: steps.bump.outputs.type != 'none'
         run: |
-          echo "## What's Changed" > release_notes.md
-          echo "${{ steps.get_commits.outputs.commits }}" | grep -E '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert):' | sed 's/^/- /' >> release_notes.md
+          # Generate temporary release notes
+          TEMP_NOTES=$(mktemp)
+          echo "## What's Changed" > "$TEMP_NOTES"
+          echo "${{ steps.get_commits.outputs.commits }}" | grep -E '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert):' | sed 's/^/- /' >> "$TEMP_NOTES"
           
           # Create release with assets using GitHub CLI
           gh release create "v${{ steps.version.outputs.new_version }}" \
             --title "Release v${{ steps.version.outputs.new_version }}" \
-            --notes-file release_notes.md \
+            --notes-file "$TEMP_NOTES" \
             ./target/myapp.war
+          
+          # Clean up temporary file
+          rm -f "$TEMP_NOTES"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           body: ${{ steps.release_notes.outputs.notes }}
