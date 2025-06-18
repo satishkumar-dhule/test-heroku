@@ -5,7 +5,9 @@
   <groupId>com.example</groupId>
   <artifactId>demo-consumer</artifactId>
   <packaging>war</packaging>
-  <version>1.6.0</version>
+
+  <version>1.8.0</version>
+
   <name>Demo Consumer Webapp</name>
   <description>A consumer application using the demo-webapp package</description>
 
