@@ -1,43 +1,32 @@
-<?xm  <groupId>com.example</groupId>
-  <artifactId>demo-consumer</artifactId>
-  <packaging>war</packaging>
-  <version>1.7.0-SNAPSHOT</version>
-  <name>Demo Consumer Webapp</name>1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
+  
   <groupId>com.example</groupId>
   <artifactId>demo-consumer</artifactId>
   <packaging>war</packaging>
-<<<<<<< HEAD
-
-  <version>1.9.0</version>
-
-=======
-  <version>1.7.0-SNAPSHOT</version>
->>>>>>> 16822e6 (feat: update deployment workflows and POM files for versioning, health checks, and GitHub Packages integration)
+  <version>1.10.0</version>
   <name>Demo Consumer Webapp</name>
   <description>A consumer application using the demo-webapp package</description>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <maven.compiler.source>17</maven.compiler.source>
     <maven.compiler.target>17</maven.compiler.target>
+    <java.version>17</java.version>
     <maven.compiler.release>17</maven.compiler.release>
+    <jdk.version>17</jdk.version>
+    <jetty.version>9.4.52.v20230823</jetty.version>
+    <demo-webapp.version>1.10.0</demo-webapp.version>
   </properties>
-
-  <repositories>
-    <repository>
-      <id>github</id>
-      <url>https://maven.pkg.github.com/${env.GITHUB_REPOSITORY}</url>
-    </repository>
-  </repositories>
 
   <dependencies>
     <dependency>
       <groupId>com.example</groupId>
       <artifactId>demo-webapp</artifactId>
-      <version>${project.version}</version>
+      <version>${demo-webapp.version}</version>
       <type>war</type>
     </dependency>
     <dependency>
@@ -46,7 +35,21 @@
       <version>4.0.1</version>
       <scope>provided</scope>
     </dependency>
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>4.13.2</version>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
+
+  <repositories>
+    <repository>
+      <id>github</id>
+      <name>GitHub Packages</name>
+      <url>https://maven.pkg.github.com/satishkumar-dhule/test-heroku</url>
+    </repository>
+  </repositories>
 
   <build>
     <finalName>demo-consumer</finalName>
@@ -54,45 +57,40 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
-        <version>3.12.1</version>
+        <version>3.11.0</version>
         <configuration>
           <release>17</release>
-          <source>17</source>
-          <target>17</target>
         </configuration>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-war-plugin</artifactId>
         <version>3.4.0</version>
-        <configuration>
-          <overlays>
-            <overlay>
-              <groupId>com.example</groupId>
-              <artifactId>demo-webapp</artifactId>
-            </overlay>
-          </overlays>
-        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-maven-plugin</artifactId>
+        <version>${jetty.version}</version>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-dependency-plugin</artifactId>
-        <version>3.6.0</version>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <version>3.4.1</version>
         <executions>
           <execution>
-            <phase>package</phase>
+            <id>enforce-maven</id>
             <goals>
-              <goal>copy</goal>
+              <goal>enforce</goal>
             </goals>
             <configuration>
-              <artifactItems>
-                <artifactItem>
-                  <groupId>org.eclipse.jetty</groupId>
-                  <artifactId>jetty-runner</artifactId>
-                  <version>9.4.46.v20220331</version>
-                  <destFileName>jetty-runner.jar</destFileName>
-                </artifactItem>
-              </artifactItems>
+              <rules>
+                <requireMavenVersion>
+                  <version>[3.8.0,)</version>
+                </requireMavenVersion>
+                <requireJavaVersion>
+                  <version>[17,)</version>
+                </requireJavaVersion>
+              </rules>
             </configuration>
           </execution>
         </executions>
