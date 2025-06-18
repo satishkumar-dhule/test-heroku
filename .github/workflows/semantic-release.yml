@@ -30,6 +30,7 @@ jobs:
           server-username: GITHUB_ACTOR
           server-password: GH_TOKEN
 
+
       - name: Verify Maven Settings
         run: |
           echo "Checking ~/.m2/settings.xml content:"
@@ -54,164 +55,114 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           GITHUB_ACTOR: ${{ secrets.GH_USER }}
 
-      - name: Check Version Availability
+      - name: Determine and Set Next Version
+        id: version
         run: |
-          # Get the current version from pom.xml
-          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
-          echo "Current version: $VERSION"
+          # Function to increment version
+          increment_version() {
+            local version=$1
+            if [[ $version =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-SNAPSHOT)?$ ]]; then
+              local major=${BASH_REMATCH[1]}
+              local minor=${BASH_REMATCH[2]}
+              local patch=${BASH_REMATCH[3]}
+              
+              # For semantic versioning based on commit messages
+              if echo "$COMMITS" | grep -q "BREAKING CHANGE:\|feat!:\|fix!:"; then
+                major=$((major + 1))
+                minor=0
+                patch=0
+              elif echo "$COMMITS" | grep -q "feat:"; then
+                minor=$((minor + 1))
+                patch=0
+              else
+                patch=$((patch + 1))
+              fi
+              
+              echo "${major}.${minor}.${patch}"
+            else
+              echo "Invalid version format"
+              exit 1
+            fi
+          }
           
-          # Try to get the existing artifact
-          if mvn dependency:get -Dartifact=com.example:demo-webapp:${VERSION}:war -DremoteRepositories=github::default::https://maven.pkg.github.com/${GITHUB_REPOSITORY} -Dtransitive=false -quiet; then
-            echo "::error::Version ${VERSION} already exists in GitHub Packages. Please update the version number."
-            exit 1
-          else
-            echo "Version ${VERSION} is available for publishing"
-          fi
+          # Get commit messages
+          COMMITS=$(git log --format=%B $(git describe --tags --abbrev=0 2>/dev/null || git rev-list --max-parents=0 HEAD)..HEAD)
+          
+          # Get current version and remove -SNAPSHOT if present
+          CURRENT_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout | sed 's/-SNAPSHOT//')
+          VERSION=$CURRENT_VERSION
+          
+          # Keep trying until we find an available version
+          while mvn dependency:get -Dartifact=com.example:demo-webapp:${VERSION}:war \
+            -DremoteRepositories=github::default::https://maven.pkg.github.com/${GITHUB_REPOSITORY} \
+            -Dtransitive=false -quiet 2>/dev/null; do
+            echo "Version ${VERSION} exists, incrementing..."
+            VERSION=$(increment_version "$VERSION")
+          done
+          
+          echo "Found available version: $VERSION"
+          
+          # Update main pom.xml
+          mvn versions:set -DnewVersion=$VERSION
+          
+          # Update consumer-app pom.xml
+          cd consumer-app
+          mvn versions:set -DnewVersion=$VERSION
+          mvn versions:set-property -Dproperty=demo-webapp.version -DnewVersion=$VERSION
+          cd ..
+          
+          # Stage the changes
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          git add pom.xml consumer-app/pom.xml
+          git commit -m "chore(release): prepare release $VERSION"
+          
+          # Set output for later steps
+          echo "new_version=${VERSION}" >> $GITHUB_OUTPUT
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
-      - name: Get commit messages
-        id: get_commits
+      - name: Build and Deploy
         run: |
-          COMMITS=$(git log --format=%B $(git describe --tags --abbrev=0 2>/dev/null || git rev-list --max-parents=0 HEAD)..HEAD)
-          echo "commits=$(echo "$COMMITS" | tr '\n' ' ')" >> $GITHUB_OUTPUT
-
-      - name: Determine version bump
-        id: bump
-        run: |
-          COMMITS="${{ steps.get_commits.outputs.commits }}"
-          if echo "$COMMITS" | grep -q 'BREAKING CHANGE:\|feat!:\|fix!:'; then
-            echo "type=major" >> $GITHUB_OUTPUT
-          elif echo "$COMMITS" | grep -q 'feat:'; then
-            echo "type=minor" >> $GITHUB_OUTPUT
-          elif echo "$COMMITS" | grep -q 'fix:\|docs:\|test:\|refactor:\|style:\|chore:'; then
-            echo "type=patch" >> $GITHUB_OUTPUT
-          else
-            echo "type=none" >> $GITHUB_OUTPUT
-          fi
+          echo "Building and deploying version ${{ steps.version.outputs.new_version }}"
           
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
-
-      - name: Calculate new version
-        id: version
-        run: |
-          LATEST_TAG=${{ steps.bump.outputs.latest_tag }}
-          CURRENT_VERSION=${LATEST_TAG#v}
-          IFS='.' read -r major minor patch <<< "$CURRENT_VERSION"
-          
-          case "${{ steps.bump.outputs.type }}" in
-            "major")
-              NEW_VERSION="$((major + 1)).0.0"
-              ;;
-            "minor")
-              NEW_VERSION="${major}.$((minor + 1)).0"
-              ;;
-            "patch")
-              NEW_VERSION="${major}.${minor}.$((patch + 1))"
-              ;;
-            *)
-              NEW_VERSION="$CURRENT_VERSION"
-              ;;
-          esac
-          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
-
-      - name: Update version and commit changes
-        if: steps.bump.outputs.type != 'none'
-        run: |
-          echo "Current version: $(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)"
-          echo "New version to set: ${{ steps.version.outputs.new_version }}"
-          
-          # Configure git first
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          
-          echo "Updating main project version..."
-          mvn versions:set -DnewVersion=${{ steps.version.outputs.new_version }} -DgenerateBackupPoms=false
-          
-          echo "Building and publishing main webapp..."
-          mvn clean deploy -DskipTests \
+          # Build and deploy to GitHub Packages
+          mvn -B clean deploy -DskipTests \
             -DaltDeploymentRepository=github::default::https://maven.pkg.github.com/${{ github.repository }}
           
-          echo "Updating consumer-app version..."
+          # Tag the release
+          git tag -a v${{ steps.version.outputs.new_version }} -m "Release ${{ steps.version.outputs.new_version }}"
+          git push origin v${{ steps.version.outputs.new_version }}
+          
+          # Create GitHub Release
+          gh release create v${{ steps.version.outputs.new_version }} \
+            --title "Release ${{ steps.version.outputs.new_version }}" \
+            --generate-notes
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          
+      - name: Update develop branch
+        if: success()
+        run: |
+          # Ensure we're on the default branch
+          git checkout ${{ github.event.repository.default_branch }}
+          
+          # Create a new version for development
+          NEXT_DEV_VERSION="${{ steps.version.outputs.new_version }}-SNAPSHOT"
+          
+          # Update versions in pom files
+          mvn versions:set -DnewVersion=$NEXT_DEV_VERSION
           cd consumer-app
-          mvn versions:set -DnewVersion=${{ steps.version.outputs.new_version }} -DgenerateBackupPoms=false
+          mvn versions:set -DnewVersion=$NEXT_DEV_VERSION
+          mvn versions:set-property -Dproperty=demo-webapp.version -DnewVersion=${{ steps.version.outputs.new_version }}
           cd ..
           
-          echo "Staging changes..."
-          git add **/pom.xml
-          git add **/pom.xml
-          
-          echo "Checking git status after staging..."
-          git status
-          
-          # Show what will be committed
-          git diff --cached
-          
-          # Verify if there are changes to commit
-          if git diff --staged --quiet; then
-            echo "No changes detected in pom.xml files"
-            echo "Current directory contents:"
-            ls -la
-            echo "Main pom.xml content:"
-            cat pom.xml
-            echo "Consumer app pom.xml content:"
-            cat consumer-app/pom.xml
-            exit 1
-          fi
-          
-          # Commit and tag
-          git commit -m "chore(release): v${{ steps.version.outputs.new_version }} [skip ci]"
-          git tag -a "v${{ steps.version.outputs.new_version }}" -m "Release v${{ steps.version.outputs.new_version }}"
-          
-          # Push changes and tags
-          git push origin HEAD:${{ github.ref }} --tags
-        
-      - name: Build with Maven
-        if: steps.bump.outputs.type != 'none'
-        run: mvn -B clean package
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-
-      - name: Generate and create release
-        if: steps.bump.outputs.type != 'none'
-        run: |
-          # Generate temporary release notes
-          TEMP_NOTES=$(mktemp)
-          echo "## What's Changed" > "$TEMP_NOTES"
-          echo "${{ steps.get_commits.outputs.commits }}" | grep -E '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert):' | sed 's/^/- /' >> "$TEMP_NOTES"
-          
-          # Create release with assets using GitHub CLI
-          gh release create "v${{ steps.version.outputs.new_version }}" \
-            --title "Release v${{ steps.version.outputs.new_version }}" \
-            --notes-file "$TEMP_NOTES" \
-            ./target/myapp.war
-          
-          # Clean up temporary file
-          rm -f "$TEMP_NOTES"
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          body: ${{ steps.release_notes.outputs.notes }}
-          draft: false
-          prerelease: false
-
-      - name: Commit version update
-        if: steps.bump.outputs.type != 'none'
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git commit -am "chore(release): v${{ steps.version.outputs.new_version }} [skip ci]"
-          git push
-
-      - name: Build and Tag
-        run: |
-          mvn -B versions:set -DnewVersion=${{ steps.version.outputs.new_version }}
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git config --global user.name "github-actions[bot]"
-          git commit -am "chore(release): prepare release ${{ steps.version.outputs.new_version }}"
-          git tag -a v${{ steps.version.outputs.new_version }} -m "Release ${{ steps.version.outputs.new_version }}"
-          git push --follow-tags
+          # Commit and push changes
+          git add pom.xml consumer-app/pom.xml
+          git commit -m "chore: prepare for next development iteration"
+          git push origin ${{ github.event.repository.default_branch }}
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
