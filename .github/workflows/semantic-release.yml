@@ -28,7 +28,7 @@ jobs:
           cache: 'maven'
           server-id: github
           server-username: GITHUB_ACTOR
-          server-password: GITHUB_TOKEN
+          server-password: GH_TOKEN
 
       - name: Get commit messages
         id: get_commits
@@ -131,7 +131,7 @@ jobs:
         if: steps.bump.outputs.type != 'none'
         run: mvn -B clean package
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Generate and create release
         if: steps.bump.outputs.type != 'none'
@@ -150,7 +150,7 @@ jobs:
           # Clean up temporary file
           rm -f "$TEMP_NOTES"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
           body: ${{ steps.release_notes.outputs.notes }}
           draft: false
           prerelease: false
