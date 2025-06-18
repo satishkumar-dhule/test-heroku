@@ -76,24 +76,31 @@ jobs:
           esac
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
 
-      - name: Update pom.xml version
+      - name: Update version and commit changes
         if: steps.bump.outputs.type != 'none'
-        run: mvn versions:set -DnewVersion=${{ steps.version.outputs.new_version }} -DgenerateBackupPoms=false
+        run: |
+          # Update version in pom.xml
+          mvn versions:set -DnewVersion=${{ steps.version.outputs.new_version }} -DgenerateBackupPoms=false
+          
+          # Configure git
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          
+          # Stage changes
+          git add pom.xml
+          
+          # Commit and tag
+          git commit -m "chore(release): v${{ steps.version.outputs.new_version }} [skip ci]"
+          git tag -a "v${{ steps.version.outputs.new_version }}" -m "Release v${{ steps.version.outputs.new_version }}"
+          
+          # Push changes and tags
+          git push origin HEAD:${{ github.ref }} --tags
         
       - name: Build with Maven
         if: steps.bump.outputs.type != 'none'
         run: mvn -B clean package
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Commit version update
-        if: steps.bump.outputs.type != 'none'
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git commit -am "chore(release): v${{ steps.version.outputs.new_version }} [skip ci]" || echo "No changes to commit"
-          git tag -a "v${{ steps.version.outputs.new_version }}" -m "Release v${{ steps.version.outputs.new_version }}"
-          git push --follow-tags
 
       - name: Generate and create release
         if: steps.bump.outputs.type != 'none'
