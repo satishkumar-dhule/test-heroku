@@ -3,6 +3,7 @@ name: Publish Package
 on:
   release:
     types: [published, released]
+  workflow_dispatch:  # Add manual trigger
 
 jobs:
   publish:
@@ -15,14 +16,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.release.tag_name }}
           fetch-depth: 0
 
       - name: Set up Maven Central Repository
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
-          distribution: 'temurin'
+          java-version: '17'  # Updated to match project Java version
+          distribution: 'temurin'  # Eclipse Temurin
+          java-package: 'jdk'  # Full JDK
           cache: 'maven'
           server-id: github
           server-username: GITHUB_ACTOR
@@ -34,6 +35,7 @@ jobs:
           git config user.name "GitHub Actions"
 
       - name: Set version from release
+        if: github.event_name == 'release'
         run: |
           RELEASE_VERSION=${{ github.event.release.tag_name }}
           VERSION=${RELEASE_VERSION#v}

@@ -19,7 +19,7 @@ public class HelloServlet extends HttpServlet {
             helloService.getGreeting(name) : 
             helloService.getWelcomeMessage();
         
-        resp.setContentType("text/plain");
-        resp.getWriter().write(greeting);
+        resp.setContentType("text/html");
+        resp.getWriter().write("<html><body>" + greeting + "</body></html>");
     }
 }

@@ -1,0 +1,99 @@
+name: Release Management
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get commit messages
+        id: get_commits
+        run: |
+          COMMITS=$(git log --format=%B $(git describe --tags --abbrev=0 2>/dev/null || git rev-list --max-parents=0 HEAD)..HEAD)
+          echo "commits<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMITS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Determine version bump
+        id: bump
+        run: |
+          COMMITS="${{ steps.get_commits.outputs.commits }}"
+          if echo "$COMMITS" | grep -q '^feat!:\|^fix!:\|^BREAKING CHANGE:'; then
+            echo "type=major" >> $GITHUB_OUTPUT
+          elif echo "$COMMITS" | grep -q '^feat:'; then
+            echo "type=minor" >> $GITHUB_OUTPUT
+          elif echo "$COMMITS" | grep -q '^fix:\|^docs:\|^test:\|^refactor:\|^style:\|^chore:'; then
+            echo "type=patch" >> $GITHUB_OUTPUT
+          else
+            echo "type=none" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Get latest version
+        id: version
+        run: |
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          CURRENT_VERSION=${LATEST_TAG#v}
+          IFS='.' read -r major minor patch <<< "$CURRENT_VERSION"
+          
+          case "${{ steps.bump.outputs.type }}" in
+            "major")
+              NEW_VERSION="$((major + 1)).0.0"
+              ;;
+            "minor")
+              NEW_VERSION="${major}.$((minor + 1)).0"
+              ;;
+            "patch")
+              NEW_VERSION="${major}.${minor}.$((patch + 1))"
+              ;;
+            *)
+              NEW_VERSION="$CURRENT_VERSION"
+              ;;
+          esac
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Update version in pom.xml
+        if: steps.bump.outputs.type != 'none'
+        run: mvn versions:set -DnewVersion=${{ steps.version.outputs.new_version }} -DgenerateBackupPoms=false
+
+      - name: Create release notes
+        if: steps.bump.outputs.type != 'none'
+        id: release_notes
+        run: |
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo "## What's Changed" >> $GITHUB_OUTPUT
+          echo "${{ steps.get_commits.outputs.commits }}" | grep -E '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert):' | sed 's/^/- /' >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        if: steps.bump.outputs.type != 'none'
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.version.outputs.new_version }}
+          release_name: Release v${{ steps.version.outputs.new_version }}
+          body: ${{ steps.release_notes.outputs.notes }}
+          draft: false
+          prerelease: false
+
+      - name: Commit version update
+        if: steps.bump.outputs.type != 'none'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git commit -am "chore(release): v${{ steps.version.outputs.new_version }} [skip ci]"
+          git push
