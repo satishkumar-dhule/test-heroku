@@ -27,12 +27,12 @@ jobs:
           cache: 'maven'
           server-id: github
           server-username: GITHUB_ACTOR
-          server-password: GITHUB_TOKEN
+          server-password: GH_TOKEN
 
       - name: Run Tests
         run: mvn -B test
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Upload Test Results
         if: always()

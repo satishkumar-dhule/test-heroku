@@ -27,7 +27,7 @@ jobs:
           cache: maven
           server-id: github
           server-username: GITHUB_ACTOR
-          server-password: GITHUB_TOKEN
+          server-password: GH_TOKEN
 
       - name: Build consumer app
         run: |
@@ -47,10 +47,10 @@ jobs:
           echo "Building consumer app..."
           mvn clean package -DskipTests
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}
           MAVEN_USERNAME: ${{ github.actor }}
-          MAVEN_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+          MAVEN_PASSWORD: ${{ secrets.GH_TOKEN }}
 
       - name: Deploy to Heroku
         uses: akhileshns/heroku-deploy@v3.12.14
