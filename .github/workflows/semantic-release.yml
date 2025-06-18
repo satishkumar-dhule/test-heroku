@@ -79,15 +79,44 @@ jobs:
       - name: Update version and commit changes
         if: steps.bump.outputs.type != 'none'
         run: |
-          # Update version in pom.xml
-          mvn versions:set -DnewVersion=${{ steps.version.outputs.new_version }} -DgenerateBackupPoms=false
+          echo "Current version: $(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)"
+          echo "New version to set: ${{ steps.version.outputs.new_version }}"
           
-          # Configure git
+          # Configure git first
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           
-          # Stage changes
-          git add pom.xml
+          echo "Updating main project version..."
+          mvn versions:set -DnewVersion=${{ steps.version.outputs.new_version }} -DgenerateBackupPoms=false
+          
+          echo "Updating consumer-app version..."
+          cd consumer-app
+          mvn versions:set -DnewVersion=${{ steps.version.outputs.new_version }} -DgenerateBackupPoms=false
+          cd ..
+          
+          echo "Checking git status..."
+          git status
+          
+          # Stage all pom.xml changes
+          git add **/pom.xml
+          
+          echo "Checking git status after staging..."
+          git status
+          
+          # Show what will be committed
+          git diff --cached
+          
+          # Verify if there are changes to commit
+          if git diff --staged --quiet; then
+            echo "No changes detected in pom.xml files"
+            echo "Current directory contents:"
+            ls -la
+            echo "Main pom.xml content:"
+            cat pom.xml
+            echo "Consumer app pom.xml content:"
+            cat consumer-app/pom.xml
+            exit 1
+          fi
           
           # Commit and tag
           git commit -m "chore(release): v${{ steps.version.outputs.new_version }} [skip ci]"
