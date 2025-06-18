@@ -39,7 +39,7 @@ new_version="$major.$minor.$patch"
 sed -i "s|<version>.*</version>|<version>$new_version</version>|" pom.xml
 
 # Update Procfile
-sed -i "s|hello-servlet-.*\.jar|hello-servlet-$new_version.jar|" Procfile
+sed -i "s|demo-webapp-.*\\.jar|demo-webapp-$new_version.jar|" Procfile
 
 # Commit version bump
 git add pom.xml Procfile
@@ -57,4 +57,4 @@ gh release create "v$new_version" \
     --title "Release v$new_version" \
     --notes "Automated release based on conventional commits" \
     --target master \
-    target/hello-servlet-$new_version.jar
+    target/demo-webapp.jar
