@@ -52,6 +52,66 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           GITHUB_ACTOR: ${{ secrets.GH_USER }}
 
+      - name: Check Version and Auto-increment if needed
+        run: |
+          # Function to increment version
+          increment_version() {
+            local version=$1
+            if [[ $version =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-SNAPSHOT)?$ ]]; then
+              local major=${BASH_REMATCH[1]}
+              local minor=${BASH_REMATCH[2]}
+              local patch=${BASH_REMATCH[3]}
+              local snapshot=${BASH_REMATCH[4]:-}
+              # Increment patch version
+              patch=$((patch + 1))
+              echo "${major}.${minor}.${patch}${snapshot}"
+            else
+              echo "Invalid version format"
+              exit 1
+            fi
+          }
+
+          # Get the current version from pom.xml
+          CURRENT_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          VERSION=$CURRENT_VERSION
+          echo "Starting with version: $VERSION"
+          
+          # Keep trying until we find an available version
+          while mvn dependency:get -Dartifact=com.example:demo-webapp:${VERSION}:war \
+            -DremoteRepositories=github::default::https://maven.pkg.github.com/${GITHUB_REPOSITORY} \
+            -Dtransitive=false -quiet 2>/dev/null; do
+            echo "Version ${VERSION} exists, incrementing..."
+            VERSION=$(increment_version "$VERSION")
+          done
+          
+          if [ "$VERSION" != "$CURRENT_VERSION" ]; then
+            echo "Found available version: $VERSION"
+            echo "Updating main pom.xml..."
+            mvn versions:set -DnewVersion=$VERSION
+            
+            echo "Updating consumer-app/pom.xml..."
+            cd consumer-app
+            # Update both the project version and the demo-webapp.version property
+            mvn versions:set -DnewVersion=$VERSION
+            mvn versions:set-property -Dproperty=demo-webapp.version -DnewVersion=$VERSION
+            cd ..
+            
+            # Stage the changes
+            git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git config --global user.name "github-actions[bot]"
+            git add pom.xml consumer-app/pom.xml
+            git commit -m "chore(release): bump version to $VERSION [skip ci]"
+            git push
+          else
+            echo "Using original version: $VERSION"
+          fi
+          
+          # Export the version for use in later steps
+          echo "RELEASE_VERSION=$VERSION" >> $GITHUB_ENV
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+
       - name: Build and publish main webapp
         run: |
           echo "Current version from pom.xml:"

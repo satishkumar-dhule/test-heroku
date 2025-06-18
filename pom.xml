@@ -15,7 +15,8 @@
         <repository>
             <id>github</id>
             <name>GitHub Packages</name>
-            <url>https://maven.pkg.github.com/${env.GITHUB_REPOSITORY}</url>
+            <url>https://maven.pkg.github.com/satishkumar-dhule/test-heroku</url>
+            <uniqueVersion>true</uniqueVersion>
         </repository>
     </distributionManagement>
 

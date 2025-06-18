@@ -57,13 +57,28 @@ jobs:
         run: |
           cd consumer-app
           
+          # Get main webapp version
+          WEBAPP_VERSION=$(curl -s -H "Authorization: token ${{ secrets.GH_TOKEN }}" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/packages/maven/com.example/demo-webapp/versions" | \
+            jq -r '.[0].name')
+          
+          if [ -z "$WEBAPP_VERSION" ]; then
+            echo "Error: Could not determine latest webapp version"
+            exit 1
+          fi
+          
+          echo "Using webapp version: $WEBAPP_VERSION"
+          
+          # Update the demo-webapp.version property
+          mvn versions:set-property -Dproperty=demo-webapp.version -DnewVersion=$WEBAPP_VERSION
+          
           # Verify main webapp is available
           echo "Verifying main webapp is available..."
           mvn dependency:get \
             -DremoteRepositories=github::default::https://maven.pkg.github.com/${{ github.repository }} \
             -DgroupId=com.example \
             -DartifactId=demo-webapp \
-            -Dversion=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout) \
+            -Dversion=$WEBAPP_VERSION \
             -Dpackaging=war \
             -Dtransitive=false
           
