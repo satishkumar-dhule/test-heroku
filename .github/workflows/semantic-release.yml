@@ -36,14 +36,14 @@ jobs:
           mkdir -p ~/.m2
           cat > ~/.m2/settings.xml << EOF
           <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-              xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
-                    http://maven.apache.org/xsd/settings-1.0.0.xsd">
+                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                    xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
+                                      http://maven.apache.org/xsd/settings-1.0.0.xsd">
             <servers>
               <server>
-          <id>github</id>
-          <username>${{ env.GITHUB_ACTOR }}</username>
-          <password>${{ env.GH_TOKEN }}</password>
+                <id>github</id>
+                <username>\${env.GITHUB_ACTOR}</username>
+                <password>\${env.GH_TOKEN}</password>
               </server>
             </servers>
           </settings>
@@ -53,6 +53,23 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           GITHUB_ACTOR: ${{ secrets.GH_USER }}
+
+      - name: Check Version Availability
+        run: |
+          # Get the current version from pom.xml
+          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          echo "Current version: $VERSION"
+          
+          # Try to get the existing artifact
+          if mvn dependency:get -Dartifact=com.example:demo-webapp:${VERSION}:war -DremoteRepositories=github::default::https://maven.pkg.github.com/${GITHUB_REPOSITORY} -Dtransitive=false -quiet; then
+            echo "::error::Version ${VERSION} already exists in GitHub Packages. Please update the version number."
+            exit 1
+          else
+            echo "Version ${VERSION} is available for publishing"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Get commit messages
         id: get_commits
