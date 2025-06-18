@@ -1,2 +1,7 @@
-target
-node_modules/
+target/
+*.log
+.idea/
+*.iml
+.mvn/
+mvnw
+mvnw.cmd
