@@ -7,7 +7,7 @@
     <groupId>com.example</groupId>
     <artifactId>demo-webapp</artifactId>
     <packaging>jar</packaging>
-    <version>1.9.2</version>
+    <version>1.9.3</version>
     <name>Demo Webapp</name>
     <description>A simple web application</description>
 
@@ -27,29 +27,29 @@
         <dependency>
             <groupId>org.eclipse.jetty</groupId>
             <artifactId>jetty-server</artifactId>
-            <version>${jetty.version}</version>
+            <version>1.9.3</version>
         </dependency>
         <dependency>
             <groupId>org.eclipse.jetty</groupId>
             <artifactId>jetty-servlet</artifactId>
-            <version>${jetty.version}</version>
+            <version>1.9.3</version>
         </dependency>
         <dependency>
             <groupId>jakarta.servlet</groupId>
             <artifactId>jakarta.servlet-api</artifactId>
-            <version>${jakarta.servlet.version}</version>
+            <version>1.9.3</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
-            <version>${junit.jupiter.version}</version>
+            <version>1.9.3</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>
-            <version>${mockito.version}</version>
+            <version>1.9.3</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -60,7 +60,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.11.0</version>
+                <version>1.9.3</version>
                 <configuration>
                     <release>17</release>
                 </configuration>
@@ -68,7 +68,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
-                <version>3.5.1</version>
+                <version>1.9.3</version>
                 <executions>
                     <execution>
                         <phase>package</phase>
@@ -88,12 +88,12 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.1.2</version>
+                <version>1.9.3</version>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-enforcer-plugin</artifactId>
-                <version>3.4.1</version>
+                <version>1.9.3</version>
                 <executions>
                     <execution>
                         <id>enforce-maven</id>
@@ -103,10 +103,10 @@
                         <configuration>
                             <rules>
                                 <requireMavenVersion>
-                                    <version>1.9.2</version>
+                                    <version>1.9.3</version>
                                 </requireMavenVersion>
                                 <requireJavaVersion>
-                                    <version>17</version>
+                                    <version>1.9.3</version>
                                 </requireJavaVersion>
                             </rules>
                         </configuration>
