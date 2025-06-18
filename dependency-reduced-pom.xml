@@ -4,7 +4,7 @@
   <groupId>com.example</groupId>
   <artifactId>demo-webapp</artifactId>
   <name>Demo Webapp</name>
-  <version>1.9.2</version>
+  <version>1.9.3</version>
   <description>A simple web application</description>
   <build>
     <finalName>demo-webapp</finalName>
@@ -51,10 +51,10 @@
             <configuration>
               <rules>
                 <requireMavenVersion>
-                  <version>1.9.2</version>
+                  <version>[3.8,)</version>
                 </requireMavenVersion>
                 <requireJavaVersion>
-                  <version>17</version>
+                  <version>[17,)</version>
                 </requireJavaVersion>
               </rules>
             </configuration>

@@ -36,7 +36,9 @@ esac
 new_version="$major.$minor.$patch"
 
 # Update pom.xml
-sed -i "s|<version>.*</version>|<version>$new_version</version>|" pom.xml
+mvn -B versions:set -DnewVersion=$new_version
+# Remove backup pom created by versions:set
+rm -f pom.xml.versionsBackup
 
 # Update Procfile
 sed -i "s|demo-webapp-.*\\.jar|demo-webapp-$new_version.jar|" Procfile
