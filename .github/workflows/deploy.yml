@@ -46,12 +46,9 @@ jobs:
             -Dversion=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout) \
             -Dpackaging=war \
             -Dtransitive=false
-          
-          echo "Building consumer app..."
-          cd consumer-app
-          mvn -B clean package -DskipTests
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           MAVEN_USERNAME: ${{ github.actor }}

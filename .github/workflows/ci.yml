@@ -33,6 +33,7 @@ jobs:
         run: mvn -B test
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Upload Test Results
         if: always()
