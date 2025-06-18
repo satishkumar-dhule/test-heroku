@@ -28,16 +28,28 @@ jobs:
           server-username: GITHUB_ACTOR
           server-password: GITHUB_TOKEN
 
-      - name: Build and deploy main webapp
+      - name: Build and publish main webapp
         run: |
           # Build and publish main webapp first
           mvn clean deploy -DskipTests
-          
-          # Build consumer app
-          cd consumer-app
-          mvn clean package -DskipTests
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+
+      - name: Publish main webapp to GitHub Packages
+        run: |
+          mvn --batch-mode deploy -DskipTests -DaltDeploymentRepository=github::default::https://maven.pkg.github.com/satishkumar-dhule/test-heroku
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
+
+      - name: Build consumer app (resolves from GitHub Packages)
+        run: |
+          cd consumer-app
+          mvn --batch-mode clean package -DskipTests
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_REPOSITORY: ${{ github.repository }}
 
       - name: Deploy to Heroku
