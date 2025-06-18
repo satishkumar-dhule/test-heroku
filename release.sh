@@ -49,12 +49,12 @@ git commit -q -m "chore(release): bump version to $new_version" || true
 git tag -a "v$new_version" -m "Release v$new_version"
 
 # Push changes and tags
-git push -q origin main
+git push -q origin master
 git push -q origin "v$new_version"
 
 # Create GitHub release
 gh release create "v$new_version" \
     --title "Release v$new_version" \
     --notes "Automated release based on conventional commits" \
-    --target main \
+    --target master \
     target/hello-servlet-$new_version.jar
