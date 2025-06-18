@@ -2,7 +2,7 @@ name: Release Management
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
 
 jobs:
   release:
@@ -20,34 +20,105 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+          server-id: github
+          server-username: GITHUB_ACTOR
+          server-password: GITHUB_TOKEN
+
       - name: Get commit messages
         id: get_commits
         run: |
           COMMITS=$(git log --format=%B $(git describe --tags --abbrev=0 2>/dev/null || git rev-list --max-parents=0 HEAD)..HEAD)
-          echo "commits<<EOF" >> $GITHUB_OUTPUT
-          echo "$COMMITS" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          echo "commits=$(echo "$COMMITS" | tr '\n' ' ')" >> $GITHUB_OUTPUT
 
       - name: Determine version bump
         id: bump
         run: |
           COMMITS="${{ steps.get_commits.outputs.commits }}"
-          if echo "$COMMITS" | grep -q '^feat!:\|^fix!:\|^BREAKING CHANGE:'; then
+          if echo "$COMMITS" | grep -q 'BREAKING CHANGE:\|feat!:\|fix!:'; then
             echo "type=major" >> $GITHUB_OUTPUT
-          elif echo "$COMMITS" | grep -q '^feat:'; then
+          elif echo "$COMMITS" | grep -q 'feat:'; then
             echo "type=minor" >> $GITHUB_OUTPUT
-          elif echo "$COMMITS" | grep -q '^fix:\|^docs:\|^test:\|^refactor:\|^style:\|^chore:'; then
+          elif echo "$COMMITS" | grep -q 'fix:\|docs:\|test:\|refactor:\|style:\|chore:'; then
             echo "type=patch" >> $GITHUB_OUTPUT
           else
             echo "type=none" >> $GITHUB_OUTPUT
           fi
+          
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
 
-      - name: Get latest version
+      - name: Calculate new version
         id: version
         run: |
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          LATEST_TAG=${{ steps.bump.outputs.latest_tag }}
           CURRENT_VERSION=${LATEST_TAG#v}
           IFS='.' read -r major minor patch <<< "$CURRENT_VERSION"
+          
+          case "${{ steps.bump.outputs.type }}" in
+            "major")
+              NEW_VERSION="$((major + 1)).0.0"
+              ;;
+            "minor")
+              NEW_VERSION="${major}.$((minor + 1)).0"
+              ;;
+            "patch")
+              NEW_VERSION="${major}.${minor}.$((patch + 1))"
+              ;;
+            *)
+              NEW_VERSION="$CURRENT_VERSION"
+              ;;
+          esac
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Update pom.xml version
+        if: steps.bump.outputs.type != 'none'
+        run: mvn versions:set -DnewVersion=${{ steps.version.outputs.new_version }} -DgenerateBackupPoms=false
+        
+      - name: Build with Maven
+        if: steps.bump.outputs.type != 'none'
+        run: mvn -B clean package
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Release
+        if: steps.bump.outputs.type != 'none'
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.version.outputs.new_version }}
+          release_name: Release v${{ steps.version.outputs.new_version }}
+          body: |
+            Changes in this Release:
+            ${{ steps.get_commits.outputs.commits }}
+          draft: false
+          prerelease: false
+
+      - name: Upload WAR
+        if: steps.bump.outputs.type != 'none'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./target/myapp.war
+          asset_name: myapp.war
+          asset_content_type: application/java-archive
+
+      - name: Commit version update
+        if: steps.bump.outputs.type != 'none'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git commit -am "chore(release): v${{ steps.version.outputs.new_version }} [skip ci]" || echo "No changes to commit"
+          git push
           
           case "${{ steps.bump.outputs.type }}" in
             "major")
