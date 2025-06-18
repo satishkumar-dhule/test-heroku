@@ -25,6 +25,10 @@ jobs:
         run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
       - name: Run release script
         run: ./release.sh
+      - name: Publish JAR to GitHub Packages
+        run: mvn -B deploy --settings .github/maven-settings.xml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     permissions:
       contents: write # Allow pushing commits and tags
       packages: write # Allow creating releases

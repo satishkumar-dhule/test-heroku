@@ -14,8 +14,13 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-      - name: Build with Maven
-        run: mvn -B package
+      - name: Download JAR from GitHub Packages
+        run: |
+          mvn dependency:get \
+            -Dartifact=com.example:demo-webapp:${{ github.event.release.tag_name }} \
+            -DrepoUrl=https://maven.pkg.github.com/${{ github.repository }} \
+            -Dtransitive=false
+          cp ~/.m2/repository/com/example/demo-webapp/${{ github.event.release.tag_name }}/demo-webapp-${{ github.event.release.tag_name }}.jar target/demo-webapp.jar
       - name: Deploy to Heroku
         uses: akhileshns/heroku-deploy@v3.12.12
         with:
@@ -23,4 +28,4 @@ jobs:
           heroku_app_name: ${{secrets.HEROKU_APP_NAME}}
           heroku_email: ${{secrets.HEROKU_EMAIL}}
           usedocker: false
-          branch: main
+          branch: ${{ github.event.release.target_commitish }}
