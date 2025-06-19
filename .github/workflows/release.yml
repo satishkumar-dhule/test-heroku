@@ -180,12 +180,25 @@ jobs:
           echo "Repository: $GITHUB_REPOSITORY"
           echo "Actor: $GITHUB_ACTOR"
           
-          # Verify GitHub CLI authentication
+          # Verify GitHub CLI authentication and setup
+          echo "🔐 Checking GitHub CLI authentication..."
           if ! gh auth status >/dev/null 2>&1; then
             echo "❌ GitHub CLI not authenticated"
             exit 1
           fi
           echo "✅ GitHub CLI authenticated"
+          
+          # Check GitHub API rate limits
+          echo "📊 Checking GitHub API rate limits..."
+          gh api rate_limit --jq '.rate | "Core API: \(.remaining)/\(.limit) remaining, resets at \(.reset | strftime("%Y-%m-%d %H:%M:%S"))"' || echo "Could not check rate limits"
+          
+          # Test basic API connectivity
+          echo "🌐 Testing GitHub API connectivity..."
+          if ! gh api repos/$GITHUB_REPOSITORY >/dev/null 2>&1; then
+            echo "❌ Cannot access repository via GitHub API"
+            exit 1
+          fi
+          echo "✅ GitHub API connectivity verified"
 
           # Check if release already exists
           if gh release view "$VERSION" >/dev/null 2>&1; then
@@ -218,42 +231,65 @@ jobs:
             ls -la target/ || echo "No target directory"
           fi
 
-          # Create release with retry logic
+          # Create release with detailed debugging and retry logic
           echo "📤 Creating release $VERSION"
+          echo "🔍 Release creation parameters:"
+          echo "  Version: $VERSION"
+          echo "  Title: Release $VERSION"
+          echo "  Target: $COMMIT_SHA"
+          echo "  Notes file: $NOTES_FILE ($(wc -l < "$NOTES_FILE") lines)"
+          
+          # Check if release notes file is valid
+          if [ ! -f "$NOTES_FILE" ] || [ ! -s "$NOTES_FILE" ]; then
+            echo "❌ Release notes file is missing or empty"
+            exit 1
+          fi
+          
           for attempt in 1 2 3; do
-            echo "Attempt $attempt to create release..."
+            echo "🔄 Attempt $attempt to create release..."
             
-            if [ -n "$JAR_FILE" ] && [ -f "$JAR_FILE" ]; then
-              if gh release create "$VERSION" \
-                --title "Release $VERSION" \
-                --notes-file "$NOTES_FILE" \
-                --target "$COMMIT_SHA"; then
-                echo "✅ Release created successfully"
-                echo "📎 Uploading JAR file..."
-                if gh release upload "$VERSION" "$JAR_FILE"; then
+            # Create release without JAR first
+            if gh release create "$VERSION" \
+              --title "Release $VERSION" \
+              --notes-file "$NOTES_FILE" \
+              --target "$COMMIT_SHA" \
+              --draft=false \
+              --prerelease=false; then
+              echo "✅ Release created successfully"
+              
+              # Upload JAR if available
+              if [ -n "$JAR_FILE" ] && [ -f "$JAR_FILE" ]; then
+                echo "📎 Uploading JAR file: $JAR_FILE"
+                if gh release upload "$VERSION" "$JAR_FILE" --clobber; then
                   echo "✅ JAR file uploaded successfully"
-                  break
                 else
-                  echo "❌ JAR upload failed, but release was created"
-                  break
+                  echo "⚠️ JAR upload failed, but release was created"
                 fi
+              else
+                echo "ℹ️ No JAR file to upload"
+              fi
+              
+              # Verify release was created
+              if gh release view "$VERSION" >/dev/null 2>&1; then
+                echo "✅ Release $VERSION verified successfully"
+                break
+              else
+                echo "❌ Release verification failed"
               fi
             else
-              if gh release create "$VERSION" \
-                --title "Release $VERSION" \
-                --notes-file "$NOTES_FILE" \
-                --target "$COMMIT_SHA"; then
-                echo "✅ Release created successfully (no JAR file)"
-                break
+              echo "❌ Release creation failed on attempt $attempt"
+              if [ $attempt -lt 3 ]; then
+                echo "⏳ Waiting 15 seconds before retry..."
+                sleep 15
               fi
             fi
-            
-            echo "❌ Attempt $attempt failed"
-            if [ $attempt -lt 3 ]; then
-              echo "⏳ Waiting 10 seconds before retry..."
-              sleep 10
-            fi
           done
+          
+          # Final check
+          if ! gh release view "$VERSION" >/dev/null 2>&1; then
+            echo "❌ Release creation ultimately failed after all attempts"
+            exit 1
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
