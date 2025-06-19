@@ -9,6 +9,8 @@ on:
 permissions:
   contents: write
   packages: write
+  actions: read
+  id-token: write
 
 jobs:
   release:
@@ -89,6 +91,9 @@ jobs:
           mvn clean package -s maven-settings.xml -DskipTests=false
           echo "Build completed. Contents of target/:"
           ls -la target/
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
 
       - name: Prepare Maven Release
         run: |
@@ -114,6 +119,7 @@ jobs:
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
 
       - name: Perform Maven Release
         run: |
@@ -124,14 +130,18 @@ jobs:
           
           # Only perform release if there are release artifacts
           if [ -f "release.properties" ]; then
-            echo "Performing Maven release..."
-            mvn -B release:perform -s maven-settings.xml
+            echo "Performing Maven release with GitHub credentials..."
+            echo "GITHUB_ACTOR: $GITHUB_ACTOR"
+            mvn -B release:perform \
+              -s maven-settings.xml \
+              -Darguments="-DskipTests -Dmaven.deploy.skip=true -s maven-settings.xml"
           else
             echo "No release.properties found, skipping release:perform"
             echo "This might mean the release was already completed or prepare step was skipped"
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
 
       - name: Generate Release Notes
         id: release_notes
