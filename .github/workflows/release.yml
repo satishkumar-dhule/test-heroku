@@ -109,3 +109,11 @@ jobs:
     permissions:
       contents: write # Allow pushing commits, tags, and creating releases
       packages: write # Allow publishing to GitHub Packages
+      issues: write # Allow creating issues
+      pull-requests: write # Allow creating pull requests
+      deployments: write # Allow creating deployments
+      checks: write # Allow creating checks
+      statuses: write # Allow creating commit statuses
+      actions: write # Allow creating actions
+      workflows: write # Allow creating workflows
+      metadata: write # Allow creating metadata   
