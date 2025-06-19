@@ -58,3 +58,4 @@ jobs:
     permissions:
       contents: write # Allow pushing commits, tags, and creating releases
       packages: write # Allow publishing to GitHub Packages
+      
