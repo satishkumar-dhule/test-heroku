@@ -7,9 +7,17 @@
     <groupId>com.example</groupId>
     <artifactId>demo-webapp</artifactId>
     <packaging>jar</packaging>
-    <version>1.9.4</version>
+    <version>1.9.5-SNAPSHOT</version>
     <name>Demo Webapp</name>
     <description>A simple web application</description>
+
+    <distributionManagement>
+        <repository>
+            <id>github</id>
+            <name>GitHub Packages</name>
+            <url>https://maven.pkg.github.com/${env.GITHUB_REPOSITORY}</url>
+        </repository>
+    </distributionManagement>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -115,4 +123,10 @@
             </plugin>
         </plugins>
     </build>
+    <scm>
+        <connection>scm:git:https://github.com/${env.GITHUB_REPOSITORY}.git</connection>
+        <developerConnection>scm:git:https://github.com/${env.GITHUB_REPOSITORY}.git</developerConnection>
+        <url>https://github.com/${env.GITHUB_REPOSITORY}</url>
+        <tag>HEAD</tag>
+    </scm>
 </project>
