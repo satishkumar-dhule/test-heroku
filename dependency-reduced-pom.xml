@@ -4,11 +4,12 @@
   <groupId>com.example</groupId>
   <artifactId>demo-webapp</artifactId>
   <name>Demo Webapp</name>
-  <version>1.9.4</version>
+  <version>1.9.5</version>
   <description>A simple web application</description>
   <scm>
     <connection>scm:git:https://github.com/${env.GITHUB_REPOSITORY}.git</connection>
     <developerConnection>scm:git:https://github.com/${env.GITHUB_REPOSITORY}.git</developerConnection>
+    <tag>demo-webapp-1.9.5</tag>
     <url>https://github.com/${env.GITHUB_REPOSITORY}</url>
   </scm>
   <build>
