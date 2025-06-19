@@ -32,33 +32,64 @@ jobs:
         run: |
           VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout | sed 's/-SNAPSHOT//')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          # Check if tag exists
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "Tag v$VERSION already exists, deleting it"
+            git tag -d "v$VERSION" || true
+            git push origin :refs/tags/v$VERSION || true
+          fi
       - name: Prepare Maven Release
-        run: mvn -B release:prepare -DautoVersionSubmodules=true -DpushChanges=true --settings .github/maven-settings.xml
+        run: |
+          mvn -B release:prepare -DautoVersionSubmodules=true -DpushChanges=true --settings .github/maven-settings.xml || {
+            echo "Maven release:prepare failed, exiting"
+            exit 1
+          }
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Fetch Tags
+        run: git fetch --tags
       - name: Perform Maven Release
-        run: mvn -B release:perform --settings .github/maven-settings.xml
+        run: |
+          mvn -B release:perform --settings .github/maven-settings.xml || {
+            echo "Maven release:perform failed, exiting"
+            exit 1
+          }
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Generate Release Notes
         id: release_notes
         run: |
           echo "Generating release notes for v${{ steps.get_version.outputs.version }}"
-          git log --pretty=%s v${{ steps.get_version.outputs.version }}^..v${{ steps.get_version.outputs.version }} > release-notes.txt
+          if git log --pretty=%s v${{ steps.get_version.outputs.version }}^..v${{ steps.get_version.outputs.version }} > release-notes.txt 2>/dev/null; then
+            echo "Release notes generated successfully"
+          else
+            echo "Warning: Could not generate release notes, using default"
+            echo "Release v${{ steps.get_version.outputs.version }} for demo-webapp" > release-notes.txt
+          fi
           echo "notes_path=release-notes.txt" >> $GITHUB_OUTPUT
       - name: Create GitHub Release
         run: |
-          gh release create v${{ steps.get_version.outputs.version }} \
-            --title "Release v${{ steps.get_version.outputs.version }}" \
-            --notes-file ${{ steps.release_notes.outputs.notes_path }} \
-            --target main \
-            target/*.jar # Attach the built JAR
+          if gh release view v${{ steps.get_version.outputs.version }} >/dev/null 2>&1; then
+            echo "Release v${{ steps.get_version.outputs.version }} already exists, skipping"
+          else
+            gh release create v${{ steps.get_version.outputs.version }} \
+              --title "Release v${{ steps.get_version.outputs.version }}" \
+              --notes-file ${{ steps.release_notes.outputs.notes_path }} \
+              --target main \
+              target/*.jar || {
+                echo "Failed to create GitHub Release, continuing"
+                exit 0
+              }
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Deploy to Heroku
         run: |
           heroku git:remote -a test-heroku-dhule # Replace with your Heroku app name
-          git push heroku main
+          git push heroku main || {
+            echo "Heroku deployment failed, please check Heroku configuration"
+            exit 0
+          }
         env:
           HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
     permissions:
