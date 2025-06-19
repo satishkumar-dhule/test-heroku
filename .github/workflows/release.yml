@@ -112,7 +112,8 @@ jobs:
               --title "Release $VERSION" \
               --notes-file "$NOTES_FILE" \
               --target "$COMMIT_SHA" \
-              target/*.jar
+              target/*.jar \
+              --verbose
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
