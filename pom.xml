@@ -148,9 +148,9 @@
     </build>
 
 <scm>
-    <connection>scm:git:git://github.com/satishkumar-dhule/test-heroku.git</connection>
-    <developerConnection>scm:git:ssh://git@github.com/satishkumar-dhule/test-heroku.git</developerConnection>
-    <url>https://github.com/satishkumar-dhule/test-heroku</url>
+            <connection>scm:git:https://github.com/satishkumar-dhule/test-heroku.git</connection>
+        <developerConnection>scm:git:https://github.com/satishkumar-dhule/test-heroku.git</developerConnection>
+        <url>https://github.com/satishkumar-dhule/test-heroku</url>
     <tag>HEAD</tag>
 </scm>
 
