@@ -40,11 +40,17 @@ jobs:
 
       - name: Install GitHub CLI
         run: |
-          sudo apt-get update
-          sudo apt-get install -y gh
+          type -p curl >/dev/null || (sudo apt update && sudo apt install curl -y)
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+          && sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+          && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+          && sudo apt update \
+          && sudo apt install gh -y
 
       - name: Authenticate GitHub CLI
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+          gh auth status
 
       - name: Setup Git Remote with Token
         run: |
@@ -89,14 +95,23 @@ jobs:
           RELEASE_VERSION=${{ steps.versioning.outputs.release_version }}
           NEXT_SNAPSHOT="${RELEASE_VERSION%.*}.$((${RELEASE_VERSION##*.}+1))-SNAPSHOT"
           echo "Preparing release: $RELEASE_VERSION → $NEXT_SNAPSHOT"
-          mvn -B release:prepare \
-            -DreleaseVersion=$RELEASE_VERSION \
-            -DdevelopmentVersion=$NEXT_SNAPSHOT \
-            -Dtag=v$RELEASE_VERSION \
-            -DautoVersionSubmodules=true \
-            -DpushChanges=true \
-            -DscmCommentPrefix="[release] " \
-            -s maven-settings.xml
+          
+          # Clean up any previous release artifacts
+          rm -f pom.xml.releaseBackup pom.xml.next pom.xml.tag release.properties
+          
+          # Check if tag already exists
+          if git rev-parse "v$RELEASE_VERSION" >/dev/null 2>&1; then
+            echo "Tag v$RELEASE_VERSION already exists, skipping release preparation"
+          else
+            mvn -B release:prepare \
+              -DreleaseVersion=$RELEASE_VERSION \
+              -DdevelopmentVersion=$NEXT_SNAPSHOT \
+              -Dtag=v$RELEASE_VERSION \
+              -DautoVersionSubmodules=true \
+              -DpushChanges=true \
+              -DscmCommentPrefix="[release] " \
+              -s maven-settings.xml
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -106,8 +121,15 @@ jobs:
           git fetch --tags
           git checkout main
           git pull origin main
-          echo "Performing Maven release..."
-          mvn -B release:perform -s maven-settings.xml
+          
+          # Only perform release if there are release artifacts
+          if [ -f "release.properties" ]; then
+            echo "Performing Maven release..."
+            mvn -B release:perform -s maven-settings.xml
+          else
+            echo "No release.properties found, skipping release:perform"
+            echo "This might mean the release was already completed or prepare step was skipped"
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -151,25 +173,31 @@ jobs:
             echo "📂 Contents of target/:"
             ls -lh target || echo "⚠️ No target directory"
 
-            # Check for JAR files in both target/ and target/checkout/target/
+            # Find JAR files more reliably
             JAR_FILES=""
-            if ls target/*.jar >/dev/null 2>&1; then
-              JAR_FILES="target/*.jar"
-            elif ls target/checkout/target/*.jar >/dev/null 2>&1; then
-              JAR_FILES="target/checkout/target/*.jar"
+            if [ -f "target/demo-webapp.jar" ]; then
+              JAR_FILES="target/demo-webapp.jar"
+              echo "✅ Found JAR file: target/demo-webapp.jar"
+            elif [ -f "target/checkout/target/demo-webapp.jar" ]; then
+              JAR_FILES="target/checkout/target/demo-webapp.jar"
+              echo "✅ Found JAR file: target/checkout/target/demo-webapp.jar"
             else
               echo "⚠️ No JAR files found, creating release without artifacts"
+              echo "Available files in target/:"
+              ls -la target/ || echo "No target directory"
             fi
 
             echo "📤 Creating release $VERSION with notes from $NOTES_FILE"
-            if [ -n "$JAR_FILES" ]; then
-              GH_DEBUG=api gh release create "$VERSION" \
+            if [ -n "$JAR_FILES" ] && [ -f "$JAR_FILES" ]; then
+              echo "Uploading JAR file: $JAR_FILES"
+              gh release create "$VERSION" \
                 --title "Release $VERSION" \
                 --notes-file "$NOTES_FILE" \
                 --target "$COMMIT_SHA" \
-                $JAR_FILES
+                "$JAR_FILES"
             else
-              GH_DEBUG=api gh release create "$VERSION" \
+              echo "Creating release without JAR file"
+              gh release create "$VERSION" \
                 --title "Release $VERSION" \
                 --notes-file "$NOTES_FILE" \
                 --target "$COMMIT_SHA"
