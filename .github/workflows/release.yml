@@ -149,21 +149,25 @@ jobs:
           VERSION="v${{ steps.versioning.outputs.release_version }}"
           echo "Generating release notes for $VERSION"
           
-          # Try to get commit messages since last tag
-          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-          if [ -n "$LAST_TAG" ] && [ "$LAST_TAG" != "$VERSION" ]; then
-            echo "Changes since $LAST_TAG:" > release-notes.txt
-            git log --pretty="- %s" "$LAST_TAG"..HEAD >> release-notes.txt || {
-              echo "Release $VERSION for demo-webapp" > release-notes.txt
-            }
-          else
-            echo "Release $VERSION for demo-webapp" > release-notes.txt
-            echo "" >> release-notes.txt
-            echo "## Changes" >> release-notes.txt
-            echo "- Initial release or no previous tags found" >> release-notes.txt
-          fi
+          # Create simple, reliable release notes
+          echo "# Release $VERSION" > release-notes.txt
+          echo "" >> release-notes.txt
+          echo "## What's Changed" >> release-notes.txt
+          echo "- Release $VERSION of demo-webapp" >> release-notes.txt
+          echo "- Built with Java 17 and Maven" >> release-notes.txt
+          echo "- Includes all dependencies in shaded JAR" >> release-notes.txt
+          echo "" >> release-notes.txt
+          echo "## Artifacts" >> release-notes.txt
+          echo "- demo-webapp.jar - Executable JAR with all dependencies" >> release-notes.txt
+          echo "" >> release-notes.txt
+          echo "## Installation" >> release-notes.txt
+          echo '```bash' >> release-notes.txt
+          echo "java -jar demo-webapp.jar" >> release-notes.txt
+          echo '```' >> release-notes.txt
+          echo "" >> release-notes.txt
+          echo "Generated automatically by GitHub Actions" >> release-notes.txt
           
-          echo "Release notes content:"
+          echo "Release notes generated:"
           cat release-notes.txt
           echo "notes_path=release-notes.txt" >> $GITHUB_OUTPUT
 
@@ -175,6 +179,13 @@ jobs:
           echo "Creating GitHub Release for $VERSION"
           echo "Repository: $GITHUB_REPOSITORY"
           echo "Actor: $GITHUB_ACTOR"
+          
+          # Verify GitHub CLI authentication
+          if ! gh auth status >/dev/null 2>&1; then
+            echo "❌ GitHub CLI not authenticated"
+            exit 1
+          fi
+          echo "✅ GitHub CLI authenticated"
 
           # Check if release already exists
           if gh release view "$VERSION" >/dev/null 2>&1; then
@@ -182,9 +193,15 @@ jobs:
             exit 0
           fi
 
-          # Get commit SHA for the tag
-          COMMIT_SHA=$(git rev-parse "$VERSION" 2>/dev/null || git rev-parse HEAD)
+          # Get commit SHA - use HEAD since we just created the tag
+          COMMIT_SHA=$(git rev-parse HEAD)
           echo "🔧 Target commit SHA: $COMMIT_SHA"
+          
+          # Verify the commit exists
+          if ! git cat-file -e "$COMMIT_SHA" 2>/dev/null; then
+            echo "❌ Commit SHA $COMMIT_SHA does not exist"
+            exit 1
+          fi
 
           # Find JAR file
           JAR_FILE=""
