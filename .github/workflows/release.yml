@@ -27,16 +27,21 @@ jobs:
           sudo apt-get install -y gh
       - name: Authenticate GitHub CLI
         run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
-      - name: Get next release version
+      - name: Validate POM Version
         id: get_version
         run: |
-          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout | sed 's/-SNAPSHOT//')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          # Check if tag exists
-          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
-            echo "Tag v$VERSION already exists, deleting it"
-            git tag -d "v$VERSION" || true
-            git push origin :refs/tags/v$VERSION || true
+          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          if [[ $VERSION != *-SNAPSHOT ]]; then
+            echo "Error: POM version ($VERSION) is not a SNAPSHOT version"
+            exit 1
+          fi
+          RELEASE_VERSION=${VERSION%-SNAPSHOT}
+          echo "version=$RELEASE_VERSION" >> $GITHUB_OUTPUT
+          # Check and clean up existing tag
+          if git rev-parse "v$RELEASE_VERSION" >/dev/null 2>&1; then
+            echo "Tag v$RELEASE_VERSION already exists, deleting it"
+            git tag -d "v$RELEASE_VERSION" || true
+            git push origin :refs/tags/v$RELEASE_VERSION || true
           fi
       - name: Prepare Maven Release
         run: |
@@ -46,8 +51,12 @@ jobs:
           }
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Fetch Tags
-        run: git fetch --tags
+      - name: Fetch Tags and Update Branch
+        run: |
+          git fetch --tags
+          git fetch origin main
+          git checkout main
+          git pull origin main
       - name: Perform Maven Release
         run: |
           mvn -B release:perform --settings .github/maven-settings.xml || {
@@ -60,10 +69,13 @@ jobs:
         id: release_notes
         run: |
           echo "Generating release notes for v${{ steps.get_version.outputs.version }}"
-          if git log --pretty=%s v${{ steps.get_version.outputs.version }}^..v${{ steps.get_version.outputs.version }} > release-notes.txt 2>/dev/null; then
-            echo "Release notes generated successfully"
+          if git rev-parse "v${{ steps.get_version.outputs.version }}" >/dev/null 2>&1; then
+            git log --pretty=%s v${{ steps.get_version.outputs.version }}^..v${{ steps.get_version.outputs.version }} > release-notes.txt 2>/dev/null || {
+              echo "Warning: Could not generate release notes, using default"
+              echo "Release v${{ steps.get_version.outputs.version }} for demo-webapp" > release-notes.txt
+            }
           else
-            echo "Warning: Could not generate release notes, using default"
+            echo "Warning: Tag v${{ steps.get_version.outputs.version }} not found, using default notes"
             echo "Release v${{ steps.get_version.outputs.version }} for demo-webapp" > release-notes.txt
           fi
           echo "notes_path=release-notes.txt" >> $GITHUB_OUTPUT
@@ -72,10 +84,12 @@ jobs:
           if gh release view v${{ steps.get_version.outputs.version }} >/dev/null 2>&1; then
             echo "Release v${{ steps.get_version.outputs.version }} already exists, skipping"
           else
+            # Get the commit SHA for the tag
+            COMMIT_SHA=$(git rev-parse v${{ steps.get_version.outputs.version }} 2>/dev/null || git rev-parse main)
             gh release create v${{ steps.get_version.outputs.version }} \
               --title "Release v${{ steps.get_version.outputs.version }}" \
               --notes-file ${{ steps.release_notes.outputs.notes_path }} \
-              --target main \
+              --target "$COMMIT_SHA" \
               target/*.jar || {
                 echo "Failed to create GitHub Release, continuing"
                 exit 0
