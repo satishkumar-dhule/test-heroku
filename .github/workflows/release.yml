@@ -172,62 +172,88 @@ jobs:
           VERSION="v${{ steps.versioning.outputs.release_version }}"
           NOTES_FILE="${{ steps.release_notes.outputs.notes_path }}"
           
-          echo "🔎 GH_DEBUG=api enabled for verbose output"
+          echo "Creating GitHub Release for $VERSION"
+          echo "Repository: $GITHUB_REPOSITORY"
+          echo "Actor: $GITHUB_ACTOR"
 
+          # Check if release already exists
           if gh release view "$VERSION" >/dev/null 2>&1; then
             echo "✅ Release $VERSION already exists, skipping"
-          else
-            COMMIT_SHA=$(git rev-parse "$VERSION" 2>/dev/null || git rev-parse HEAD)
-            echo "🔧 Resolved commit SHA: $COMMIT_SHA"
-
-            echo "📂 Contents of target/:"
-            ls -lh target || echo "⚠️ No target directory"
-
-            # Find JAR files more reliably
-            JAR_FILES=""
-            if [ -f "target/demo-webapp.jar" ]; then
-              JAR_FILES="target/demo-webapp.jar"
-              echo "✅ Found JAR file: target/demo-webapp.jar"
-            elif [ -f "target/checkout/target/demo-webapp.jar" ]; then
-              JAR_FILES="target/checkout/target/demo-webapp.jar"
-              echo "✅ Found JAR file: target/checkout/target/demo-webapp.jar"
-            else
-              echo "⚠️ No JAR files found, creating release without artifacts"
-              echo "Available files in target/:"
-              ls -la target/ || echo "No target directory"
-            fi
-
-            echo "📤 Creating release $VERSION with notes from $NOTES_FILE"
-            if [ -n "$JAR_FILES" ] && [ -f "$JAR_FILES" ]; then
-              echo "Uploading JAR file: $JAR_FILES"
-              gh release create "$VERSION" \
-                --title "Release $VERSION" \
-                --notes-file "$NOTES_FILE" \
-                --target "$COMMIT_SHA" \
-                "$JAR_FILES"
-            else
-              echo "Creating release without JAR file"
-              gh release create "$VERSION" \
-                --title "Release $VERSION" \
-                --notes-file "$NOTES_FILE" \
-                --target "$COMMIT_SHA"
-            fi
+            exit 0
           fi
+
+          # Get commit SHA for the tag
+          COMMIT_SHA=$(git rev-parse "$VERSION" 2>/dev/null || git rev-parse HEAD)
+          echo "🔧 Target commit SHA: $COMMIT_SHA"
+
+          # Find JAR file
+          JAR_FILE=""
+          if [ -f "target/demo-webapp.jar" ]; then
+            JAR_FILE="target/demo-webapp.jar"
+            echo "✅ Found JAR file: $JAR_FILE"
+            echo "JAR file size: $(ls -lh "$JAR_FILE" | awk '{print $5}')"
+          elif [ -f "target/checkout/target/demo-webapp.jar" ]; then
+            JAR_FILE="target/checkout/target/demo-webapp.jar"
+            echo "✅ Found JAR file: $JAR_FILE"
+            echo "JAR file size: $(ls -lh "$JAR_FILE" | awk '{print $5}')"
+          else
+            echo "⚠️ No JAR files found"
+            ls -la target/ || echo "No target directory"
+          fi
+
+          # Create release with retry logic
+          echo "📤 Creating release $VERSION"
+          for attempt in 1 2 3; do
+            echo "Attempt $attempt to create release..."
+            
+            if [ -n "$JAR_FILE" ] && [ -f "$JAR_FILE" ]; then
+              if gh release create "$VERSION" \
+                --title "Release $VERSION" \
+                --notes-file "$NOTES_FILE" \
+                --target "$COMMIT_SHA"; then
+                echo "✅ Release created successfully"
+                echo "📎 Uploading JAR file..."
+                if gh release upload "$VERSION" "$JAR_FILE"; then
+                  echo "✅ JAR file uploaded successfully"
+                  break
+                else
+                  echo "❌ JAR upload failed, but release was created"
+                  break
+                fi
+              fi
+            else
+              if gh release create "$VERSION" \
+                --title "Release $VERSION" \
+                --notes-file "$NOTES_FILE" \
+                --target "$COMMIT_SHA"; then
+                echo "✅ Release created successfully (no JAR file)"
+                break
+              fi
+            fi
+            
+            echo "❌ Attempt $attempt failed"
+            if [ $attempt -lt 3 ]; then
+              echo "⏳ Waiting 10 seconds before retry..."
+              sleep 10
+            fi
+          done
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_ACTOR: ${{ github.actor }}
 
-      - name: Install Heroku CLI
-        run: |
-          curl https://cli-assets.heroku.com/install.sh | sh
-          heroku --version
+      # - name: Install Heroku CLI
+      #   run: |
+      #     curl https://cli-assets.heroku.com/install.sh | sh
+      #     heroku --version
 
-      - name: Deploy to Heroku
-        run: |
-          heroku git:remote -a test-heroku-dhule
-          git push heroku main || {
-            echo "❌ Heroku deployment failed, but continuing..."
-            echo "This might be expected if the Heroku app doesn't exist or credentials are not configured."
-            exit 0
-          }
-        env:
-          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+      # - name: Deploy to Heroku
+      #   run: |
+      #     heroku git:remote -a test-heroku-dhule
+      #     git push heroku main || {
+      #       echo "❌ Heroku deployment failed, but continuing..."
+      #       echo "This might be expected if the Heroku app doesn't exist or credentials are not configured."
+      #       exit 0
+      #     }
+      #   env:
+      #     HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
