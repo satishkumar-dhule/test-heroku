@@ -40,7 +40,13 @@ jobs:
           fi
           RELEASE_VERSION=${VERSION%-SNAPSHOT}
           echo "version=$RELEASE_VERSION" >> $GITHUB_OUTPUT
-          # Check and clean up existing tag
+          # Clean up incorrect SNAPSHOT tags
+          if git rev-parse "v$RELEASE_VERSION-SNAPSHOT" >/dev/null 2>&1; then
+            echo "Deleting incorrect tag v$RELEASE_VERSION-SNAPSHOT"
+            git tag -d "v$RELEASE_VERSION-SNAPSHOT" || true
+            git push origin :refs/tags/v$RELEASE_VERSION-SNAPSHOT || true
+          fi
+          # Clean up existing release tag
           if git rev-parse "v$RELEASE_VERSION" >/dev/null 2>&1; then
             echo "Tag v$RELEASE_VERSION already exists, deleting it"
             git tag -d "v$RELEASE_VERSION" || true
@@ -48,7 +54,8 @@ jobs:
           fi
       - name: Prepare Maven Release
         run: |
-          mvn -B release:prepare -DautoVersionSubmodules=true -DpushChanges=true --settings .github/maven-settings.xml || {
+          RELEASE_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout | sed 's/-SNAPSHOT//')
+          mvn -B release:prepare -DreleaseVersion=$RELEASE_VERSION -DdevelopmentVersion=${RELEASE_VERSION%.*}.$((${RELEASE_VERSION##*.}+1))-SNAPSHOT -Dtag=v$RELEASE_VERSION -DautoVersionSubmodules=true -DpushChanges=true --settings .github/maven-settings.xml || {
             echo "Maven release:prepare failed, exiting"
             exit 1
           }
@@ -87,7 +94,7 @@ jobs:
           if gh release view v${{ steps.get_version.outputs.version }} >/dev/null 2>&1; then
             echo "Release v${{ steps.get_version.outputs.version }} already exists, skipping"
           else
-            COMMIT_SHA=$(git rev-parse v${{ steps.get_version.outputs.version }} 2>/dev/null || git rev-parse main)
+            COMMIT_SHA=$(git rev-parse v${{ steps.get_version.outputs.version }} 2>/dev/null || git rev-parse HEAD)
             gh release create v${{ steps.get_version.outputs.version }} \
               --title "Release v${{ steps.get_version.outputs.version }}" \
               --notes-file ${{ steps.release_notes.outputs.notes_path }} \
