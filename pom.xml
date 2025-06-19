@@ -138,11 +138,6 @@
                             <goal>enforce</goal>
                         </goals>
                         <configuration>
-                            <rules>
-                                <requireSnapshotVersion>
-                                    <message>POM version must be a SNAPSHOT version in development</message>
-                                </requireSnapshotVersion>
-                            </rules>
                         </configuration>
                     </execution>
                 </executions>
