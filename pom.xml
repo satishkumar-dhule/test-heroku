@@ -5,7 +5,7 @@
     <groupId>com.example</groupId>
     <artifactId>demo-webapp</artifactId>
     <packaging>jar</packaging>
-    <version>1.9.7-SNAPSHOT</version>
+    <version>1.9.7</version>
     <name>Demo Webapp</name>
     <description>A simple web application</description>
 
@@ -134,6 +134,6 @@
         <connection>scm:git:https://github.com/${env.GITHUB_REPOSITORY}.git</connection>
         <developerConnection>scm:git:https://github.com/${env.GITHUB_REPOSITORY}.git</developerConnection>
         <url>https://github.com/${env.GITHUB_REPOSITORY}</url>
-        <tag>HEAD</tag>
+        <tag>v1.9.7</tag>
     </scm>
 </project>
