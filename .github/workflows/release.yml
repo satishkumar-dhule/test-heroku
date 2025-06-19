@@ -206,15 +206,25 @@ jobs:
             exit 0
           fi
 
-          # Get commit SHA - use HEAD since we just created the tag
-          COMMIT_SHA=$(git rev-parse HEAD)
-          echo "🔧 Target commit SHA: $COMMIT_SHA"
+          # Check if tag already exists and handle appropriately
+          if git rev-parse "$VERSION" >/dev/null 2>&1; then
+            echo "⚠️ Tag $VERSION already exists"
+            COMMIT_SHA=$(git rev-parse "$VERSION")
+            echo "🔧 Using existing tag commit SHA: $COMMIT_SHA"
+          else
+            echo "ℹ️ Tag $VERSION does not exist, will create release on current commit"
+            COMMIT_SHA=$(git rev-parse HEAD)
+            echo "🔧 Using HEAD commit SHA: $COMMIT_SHA"
+          fi
           
           # Verify the commit exists
           if ! git cat-file -e "$COMMIT_SHA" 2>/dev/null; then
             echo "❌ Commit SHA $COMMIT_SHA does not exist"
             exit 1
           fi
+          
+          echo "📋 Git status:"
+          git log --oneline -3 || echo "Could not show git log"
 
           # Find JAR file
           JAR_FILE=""
@@ -249,12 +259,17 @@ jobs:
             echo "🔄 Attempt $attempt to create release..."
             
             # Create release without JAR first
-            if gh release create "$VERSION" \
-              --title "Release $VERSION" \
-              --notes-file "$NOTES_FILE" \
-              --target "$COMMIT_SHA" \
-              --draft=false \
-              --prerelease=false; then
+            # Only specify target if tag doesn't exist to avoid conflicts
+            if git rev-parse "$VERSION" >/dev/null 2>&1; then
+              echo "🏷️ Creating release for existing tag $VERSION"
+              CREATE_CMD="gh release create \"$VERSION\" --title \"Release $VERSION\" --notes-file \"$NOTES_FILE\""
+            else
+              echo "🏷️ Creating release and tag $VERSION on commit $COMMIT_SHA"
+              CREATE_CMD="gh release create \"$VERSION\" --title \"Release $VERSION\" --notes-file \"$NOTES_FILE\" --target \"$COMMIT_SHA\""
+            fi
+            
+            echo "🔧 Running: $CREATE_CMD"
+            if eval "$CREATE_CMD"; then
               echo "✅ Release created successfully"
               
               # Upload JAR if available
