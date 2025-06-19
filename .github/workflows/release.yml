@@ -147,27 +147,55 @@ jobs:
         run: |
           VERSION="v${{ steps.versioning.outputs.release_version }}"
           echo "Deploying JAR to GitHub Packages for $VERSION"
+          echo "GITHUB_ACTOR: $GITHUB_ACTOR"
+          echo "Repository: $GITHUB_REPOSITORY"
           
-          # Find the built JAR file
+          # Verify authentication
+          echo "Verifying GitHub authentication..."
+          curl -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/user | head -5 || echo "Auth check failed"
+          
+          # Find the built JAR file and deploy
           if [ -f "target/demo-webapp.jar" ]; then
             echo "Found JAR file: target/demo-webapp.jar"
-            # Deploy the JAR to GitHub Packages
-            mvn deploy -s maven-settings.xml -DskipTests=true
+            echo "JAR file size: $(ls -lh target/demo-webapp.jar)"
+            
+            # Deploy the JAR to GitHub Packages with explicit settings
+            echo "Deploying to GitHub Packages..."
+            mvn deploy \
+              -s maven-settings.xml \
+              -DskipTests=true \
+              -Dregistry=https://maven.pkg.github.com/satishkumar-dhule/test-heroku \
+              -Dtoken=$GITHUB_TOKEN \
+              -X
             echo "✅ Successfully deployed to GitHub Packages"
+            
           elif [ -f "target/checkout/target/demo-webapp.jar" ]; then
             echo "Found JAR file: target/checkout/target/demo-webapp.jar"
+            echo "JAR file size: $(ls -lh target/checkout/target/demo-webapp.jar)"
             cd target/checkout
-            mvn deploy -s ../../maven-settings.xml -DskipTests=true
+            
+            echo "Deploying to GitHub Packages from checkout directory..."
+            mvn deploy \
+              -s ../../maven-settings.xml \
+              -DskipTests=true \
+              -Dregistry=https://maven.pkg.github.com/satishkumar-dhule/test-heroku \
+              -Dtoken=$GITHUB_TOKEN \
+              -X
             cd ../..
             echo "✅ Successfully deployed to GitHub Packages"
+            
           else
             echo "❌ No JAR file found for deployment"
+            echo "Contents of target/:"
             ls -la target/ || echo "No target directory"
+            echo "Contents of target/checkout/target/ (if exists):"
+            ls -la target/checkout/target/ 2>/dev/null || echo "No checkout target directory"
             exit 1
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
 
       # Removed Generate Release Notes step - using inline notes instead
 
