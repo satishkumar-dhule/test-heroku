@@ -125,6 +125,7 @@
                 <version>3.0.1</version>
                 <configuration>
                     <tagNameFormat>v@{project.version}</tagNameFormat>
+                    <tagBase>https://github.com/satishkumar-dhule/test-heroku/tags</tagBase>
                 </configuration>
             </plugin>
         </plugins>
