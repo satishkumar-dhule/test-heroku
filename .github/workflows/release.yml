@@ -134,10 +134,36 @@ jobs:
             echo "GITHUB_ACTOR: $GITHUB_ACTOR"
             mvn -B release:perform \
               -s maven-settings.xml \
-              -Darguments="-DskipTests -Dmaven.deploy.skip=true -s maven-settings.xml"
+              -Darguments="-DskipTests -s maven-settings.xml"
           else
             echo "No release.properties found, skipping release:perform"
             echo "This might mean the release was already completed or prepare step was skipped"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
+
+      - name: Deploy to GitHub Packages
+        run: |
+          VERSION="v${{ steps.versioning.outputs.release_version }}"
+          echo "Deploying JAR to GitHub Packages for $VERSION"
+          
+          # Find the built JAR file
+          if [ -f "target/demo-webapp.jar" ]; then
+            echo "Found JAR file: target/demo-webapp.jar"
+            # Deploy the JAR to GitHub Packages
+            mvn deploy -s maven-settings.xml -DskipTests=true
+            echo "✅ Successfully deployed to GitHub Packages"
+          elif [ -f "target/checkout/target/demo-webapp.jar" ]; then
+            echo "Found JAR file: target/checkout/target/demo-webapp.jar"
+            cd target/checkout
+            mvn deploy -s ../../maven-settings.xml -DskipTests=true
+            cd ../..
+            echo "✅ Successfully deployed to GitHub Packages"
+          else
+            echo "❌ No JAR file found for deployment"
+            ls -la target/ || echo "No target directory"
+            exit 1
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

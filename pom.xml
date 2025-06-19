@@ -23,6 +23,14 @@
         <mockito.version>5.2.0</mockito.version>
     </properties>
 
+    <distributionManagement>
+        <repository>
+            <id>github</id>
+            <name>GitHub Packages</name>
+            <url>https://maven.pkg.github.com/satishkumar-dhule/test-heroku</url>
+        </repository>
+    </distributionManagement>
+
     <dependencies>
         <dependency>
             <groupId>org.eclipse.jetty</groupId>
