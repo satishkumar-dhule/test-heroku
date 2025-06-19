@@ -104,16 +104,24 @@ jobs:
         run: |
           VERSION="v${{ steps.versioning.outputs.release_version }}"
           NOTES_FILE="${{ steps.release_notes.outputs.notes_path }}"
+          
+          echo "🔎 GH_DEBUG=api enabled for verbose output"
+
           if gh release view "$VERSION" >/dev/null 2>&1; then
             echo "✅ Release $VERSION already exists, skipping"
           else
             COMMIT_SHA=$(git rev-parse "$VERSION" 2>/dev/null || git rev-parse HEAD)
-            gh release create "$VERSION" \
+            echo "🔧 Resolved commit SHA: $COMMIT_SHA"
+
+            echo "📂 Contents of target/:"
+            ls -lh target || echo "⚠️ No target directory"
+
+            echo "📤 Creating release $VERSION with notes from $NOTES_FILE"
+            GH_DEBUG=api gh release create "$VERSION" \
               --title "Release $VERSION" \
               --notes-file "$NOTES_FILE" \
               --target "$COMMIT_SHA" \
-              target/*.jar \
-              --verbose
+              target/*.jar
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
