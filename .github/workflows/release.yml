@@ -1,120 +1,124 @@
 name: Semantic Release
+
 on:
   push:
     branches:
       - main
       - master
+
+permissions:
+  contents: write
+  packages: write
+
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Fetch all history for git log parsing
+          fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
-      - name: Configure Git user
+
+      - name: Configure Git
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
+
       - name: Install GitHub CLI
         run: |
           sudo apt-get update
           sudo apt-get install -y gh
+
       - name: Authenticate GitHub CLI
         run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
-      - name: Validate and Fix POM Version
-        id: get_version
+
+      - name: Extract and Fix Project Version
+        id: versioning
         run: |
           VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          RELEASE_VERSION=${VERSION%-SNAPSHOT}
+          echo "release_version=$RELEASE_VERSION" >> $GITHUB_OUTPUT
+
           if [[ $VERSION != *-SNAPSHOT ]]; then
-            echo "Warning: POM version ($VERSION) is not a SNAPSHOT version, fixing to $VERSION-SNAPSHOT"
-            mvn versions:set -DnewVersion=$VERSION-SNAPSHOT -q
+            echo "Fixing non-SNAPSHOT version: $VERSION → $VERSION-SNAPSHOT"
+            mvn versions:set -DnewVersion="$VERSION-SNAPSHOT" -q
             git add pom.xml
-            git commit -m "Fix pom.xml version to $VERSION-SNAPSHOT" || true
+            git commit -m "fix: restore SNAPSHOT version $VERSION-SNAPSHOT" || true
             git push origin main || true
           fi
-          RELEASE_VERSION=${VERSION%-SNAPSHOT}
-          echo "version=$RELEASE_VERSION" >> $GITHUB_OUTPUT
-          # Clean up incorrect SNAPSHOT tags
-          if git rev-parse "v$RELEASE_VERSION-SNAPSHOT" >/dev/null 2>&1; then
-            echo "Deleting incorrect tag v$RELEASE_VERSION-SNAPSHOT"
-            git tag -d "v$RELEASE_VERSION-SNAPSHOT" || true
-            git push origin :refs/tags/v$RELEASE_VERSION-SNAPSHOT || true
-          fi
-          # Clean up existing release tag
-          if git rev-parse "v$RELEASE_VERSION" >/dev/null 2>&1; then
-            echo "Tag v$RELEASE_VERSION already exists, deleting it"
-            git tag -d "v$RELEASE_VERSION" || true
-            git push origin :refs/tags/v$RELEASE_VERSION || true
-          fi
+
+          # Delete incorrect or old tags
+          for tag in "v$RELEASE_VERSION" "v$RELEASE_VERSION-SNAPSHOT"; do
+            if git rev-parse "$tag" >/dev/null 2>&1; then
+              echo "Deleting tag $tag"
+              git tag -d "$tag" || true
+              git push origin ":refs/tags/$tag" || true
+            fi
+          done
+
       - name: Prepare Maven Release
         run: |
-          RELEASE_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout | sed 's/-SNAPSHOT//')
-          mvn -B release:prepare -DreleaseVersion=$RELEASE_VERSION -DdevelopmentVersion=${RELEASE_VERSION%.*}.$((${RELEASE_VERSION##*.}+1))-SNAPSHOT -Dtag=v$RELEASE_VERSION -DautoVersionSubmodules=true -DpushChanges=true --settings .github/maven-settings.xml || {
-            echo "Maven release:prepare failed, exiting"
-            exit 1
-          }
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Fetch Tags and Update Branch
-        run: |
-          git fetch --tags
-          git fetch origin main
-          git checkout main
-          git pull origin main
+          RELEASE_VERSION=${{ steps.versioning.outputs.release_version }}
+          NEXT_SNAPSHOT="${RELEASE_VERSION%.*}.$((${RELEASE_VERSION##*.}+1))-SNAPSHOT"
+          mvn -B release:prepare \
+            -DreleaseVersion=$RELEASE_VERSION \
+            -DdevelopmentVersion=$NEXT_SNAPSHOT \
+            -Dtag=v$RELEASE_VERSION \
+            -DautoVersionSubmodules=true \
+            -DpushChanges=true \
+            --settings .github/maven-settings.xml
+
       - name: Perform Maven Release
         run: |
-          mvn -B release:perform --settings .github/maven-settings.xml || {
-            echo "Maven release:perform failed, exiting"
-            exit 1
-          }
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          git fetch --tags
+          git checkout main
+          git pull origin main
+          mvn -B release:perform --settings .github/maven-settings.xml
+
       - name: Generate Release Notes
         id: release_notes
         run: |
-          echo "Generating release notes for v${{ steps.get_version.outputs.version }}"
-          if git rev-parse "v${{ steps.get_version.outputs.version }}" >/dev/null 2>&1; then
-            git log --pretty=%s v${{ steps.get_version.outputs.version }}^..v${{ steps.get_version.outputs.version }} > release-notes.txt 2>/dev/null || {
-              echo "Warning: Could not generate release notes, using default"
-              echo "Release v${{ steps.get_version.outputs.version }} for demo-webapp" > release-notes.txt
+          VERSION="v${{ steps.versioning.outputs.release_version }}"
+          echo "Generating release notes for $VERSION"
+          if git rev-parse "$VERSION" >/dev/null 2>&1; then
+            git log --pretty=%s "$VERSION"^.."$VERSION" > release-notes.txt || {
+              echo "Release $VERSION for demo-webapp" > release-notes.txt
             }
           else
-            echo "Warning: Tag v${{ steps.get_version.outputs.version }} not found, using default notes"
-            echo "Release v${{ steps.get_version.outputs.version }} for demo-webapp" > release-notes.txt
+            echo "Release $VERSION for demo-webapp" > release-notes.txt
           fi
           echo "notes_path=release-notes.txt" >> $GITHUB_OUTPUT
+
       - name: Create GitHub Release
         run: |
-          if gh release view v${{ steps.get_version.outputs.version }} >/dev/null 2>&1; then
-            echo "Release v${{ steps.get_version.outputs.version }} already exists, skipping"
+          VERSION="v${{ steps.versioning.outputs.release_version }}"
+          NOTES_FILE="${{ steps.release_notes.outputs.notes_path }}"
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            echo "✅ Release $VERSION already exists, skipping"
           else
-            COMMIT_SHA=$(git rev-parse v${{ steps.get_version.outputs.version }} 2>/dev/null || git rev-parse HEAD)
-            gh release create v${{ steps.get_version.outputs.version }} \
-              --title "Release v${{ steps.get_version.outputs.version }}" \
-              --notes-file ${{ steps.release_notes.outputs.notes_path }} \
+            COMMIT_SHA=$(git rev-parse "$VERSION" 2>/dev/null || git rev-parse HEAD)
+            gh release create "$VERSION" \
+              --title "Release $VERSION" \
+              --notes-file "$NOTES_FILE" \
               --target "$COMMIT_SHA" \
-              target/*.jar || {
-                echo "Failed to create GitHub Release, continuing"
-                exit 0
-              }
+              target/*.jar
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Deploy to Heroku
         run: |
-          heroku git:remote -a test-heroku-dhule # Replace with your Heroku app name
+          heroku git:remote -a test-heroku-dhule
           git push heroku main || {
-            echo "Heroku deployment failed, please check Heroku configuration"
-            exit 0
+            echo "❌ Heroku deployment failed"
+            exit 1
           }
         env:
           HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
-    permissions:
-      contents: write # Allow pushing commits, tags, and creating releases
-      packages: write # Allow publishing to GitHub Packages
