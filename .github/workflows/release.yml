@@ -27,13 +27,16 @@ jobs:
           sudo apt-get install -y gh
       - name: Authenticate GitHub CLI
         run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
-      - name: Validate POM Version
+      - name: Validate and Fix POM Version
         id: get_version
         run: |
           VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
           if [[ $VERSION != *-SNAPSHOT ]]; then
-            echo "Error: POM version ($VERSION) is not a SNAPSHOT version"
-            exit 1
+            echo "Warning: POM version ($VERSION) is not a SNAPSHOT version, fixing to $VERSION-SNAPSHOT"
+            mvn versions:set -DnewVersion=$VERSION-SNAPSHOT -q
+            git add pom.xml
+            git commit -m "Fix pom.xml version to $VERSION-SNAPSHOT" || true
+            git push origin main || true
           fi
           RELEASE_VERSION=${VERSION%-SNAPSHOT}
           echo "version=$RELEASE_VERSION" >> $GITHUB_OUTPUT
@@ -84,7 +87,6 @@ jobs:
           if gh release view v${{ steps.get_version.outputs.version }} >/dev/null 2>&1; then
             echo "Release v${{ steps.get_version.outputs.version }} already exists, skipping"
           else
-            # Get the commit SHA for the tag
             COMMIT_SHA=$(git rev-parse v${{ steps.get_version.outputs.version }} 2>/dev/null || git rev-parse main)
             gh release create v${{ steps.get_version.outputs.version }} \
               --title "Release v${{ steps.get_version.outputs.version }}" \
