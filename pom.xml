@@ -132,14 +132,6 @@
                             </rules>
                         </configuration>
                     </execution>
-                    <execution>
-                        <id>enforce-snapshot</id>
-                        <goals>
-                            <goal>enforce</goal>
-                        </goals>
-                        <configuration>
-                        </configuration>
-                    </execution>
                 </executions>
             </plugin>
             <plugin>
