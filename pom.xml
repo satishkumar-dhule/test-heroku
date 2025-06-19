@@ -5,7 +5,7 @@
     <groupId>com.example</groupId>
     <artifactId>demo-webapp</artifactId>
     <packaging>jar</packaging>
-    <version>1.9.6-SNAPSHOT</version>
+    <version>1.9.7-SNAPSHOT</version>
     <name>Demo Webapp</name>
     <description>A simple web application</description>
 
