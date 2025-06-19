@@ -122,3 +122,6 @@ jobs:
           }
         env:
           HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+    permissions:
+      contents: write # Allow pushing commits, tags, and creating releases
+      packages: write # Allow publishing to GitHub Packages
