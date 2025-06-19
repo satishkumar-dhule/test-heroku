@@ -40,6 +40,21 @@ jobs:
         run: mvn -B release:perform --settings .github/maven-settings.xml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Generate Release Notes
+        id: release_notes
+        run: |
+          echo "Generating release notes for v${{ steps.get_version.outputs.version }}"
+          git log --pretty=%s v${{ steps.get_version.outputs.version }}^..v${{ steps.get_version.outputs.version }} > release-notes.txt
+          echo "notes_path=release-notes.txt" >> $GITHUB_OUTPUT
+      - name: Create GitHub Release
+        run: |
+          gh release create v${{ steps.get_version.outputs.version }} \
+            --title "Release v${{ steps.get_version.outputs.version }}" \
+            --notes-file ${{ steps.release_notes.outputs.notes_path }} \
+            --target main \
+            target/*.jar # Attach the built JAR as an asset
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     permissions:
-      contents: write # Allow pushing commits and tags
-      packages: write # Allow creating releases
+      contents: write # Allow pushing commits, tags, and creating releases
+      packages: write # Allow publishing to GitHub Packages
