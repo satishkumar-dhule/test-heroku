@@ -23,10 +23,12 @@ jobs:
           sudo apt-get install -y gh
       - name: Authenticate GitHub CLI
         run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
-      - name: Run release script
-        run: ./release.sh
-      - name: Publish JAR to GitHub Packages
-        run: mvn -B deploy --settings .github/maven-settings.xml
+      - name: Prepare Maven Release
+        run: mvn -B release:prepare -DautoVersionSubmodules=true -DpushChanges=true -DreleaseVersion=auto -DdevelopmentVersion=auto --settings .github/maven-settings.xml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Perform Maven Release
+        run: mvn -B release:perform --settings .github/maven-settings.xml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     permissions:
