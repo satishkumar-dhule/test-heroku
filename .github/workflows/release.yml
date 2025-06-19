@@ -74,6 +74,8 @@ jobs:
             -DautoVersionSubmodules=true \
             -DpushChanges=true \
             --settings .github/maven-settings.xml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Perform Maven Release
         run: |
@@ -81,6 +83,8 @@ jobs:
           git checkout main
           git pull origin main
           mvn -B release:perform --settings .github/maven-settings.xml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Generate Release Notes
         id: release_notes
