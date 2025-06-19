@@ -5,7 +5,7 @@
     <groupId>com.example</groupId>
     <artifactId>demo-webapp</artifactId>
     <packaging>jar</packaging>
-    <version>1.9.7</version>
+    <version>1.9.8-SNAPSHOT</version>
     <name>Demo Webapp</name>
     <description>A simple web application</description>
 
@@ -13,7 +13,7 @@
         <repository>
             <id>github</id>
             <name>GitHub Packages</name>
-            <url>https://maven.pkg.github.com/${env.GITHUB_REPOSITORY}</url>
+            <url>https://maven.pkg.github.com/satishkumar-dhule/test-heroku</url>
         </repository>
     </distributionManagement>
 
@@ -74,7 +74,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
-                <version>3.5.1</version>
+                <version>3.5.3</version>
                 <executions>
                     <execution>
                         <phase>package</phase>
@@ -82,11 +82,26 @@
                             <goal>shade</goal>
                         </goals>
                         <configuration>
+                            <createDependencyReducedPom>true</createDependencyReducedPom>
                             <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <mainClass>com.example.JettyServer</mainClass>
                                 </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
+                                    <resource>META-INF/LICENSE</resource>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
+                                    <resource>META-INF/NOTICE.txt</resource>
+                                </transformer>
                             </transformers>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/MANIFEST.MF</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
                         </configuration>
                     </execution>
                 </executions>
@@ -124,16 +139,17 @@
                 <artifactId>maven-release-plugin</artifactId>
                 <version>3.0.1</version>
                 <configuration>
-                    <tagNameFormat>v@{project.version}</tagNameFormat>
-                    <tagBase>https://github.com/satishkumar-dhule/test-heroku/tags</tagBase>
+                    <tagNameFormat>v${project.version}</tagNameFormat>
+                    <autoVersionSubmodules>true</autoVersionSubmodules>
+                    <pushChanges>true</pushChanges>
                 </configuration>
             </plugin>
         </plugins>
     </build>
+
     <scm>
-        <connection>scm:git:https://github.com/${env.GITHUB_REPOSITORY}.git</connection>
-        <developerConnection>scm:git:https://github.com/${env.GITHUB_REPOSITORY}.git</developerConnection>
-        <url>https://github.com/${env.GITHUB_REPOSITORY}</url>
-        <tag>v1.9.7</tag>
+        <connection>scm:git:https://github.com/satishkumar-dhule/test-heroku.git</connection>
+        <developerConnection>scm:git:https://github.com/satishkumar-dhule/test-heroku.git</developerConnection>
+        <url>https://github.com/satishkumar-dhule/test-heroku</url>
     </scm>
 </project>

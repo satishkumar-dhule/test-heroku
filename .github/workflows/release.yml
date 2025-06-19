@@ -33,7 +33,7 @@ jobs:
           VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout | sed 's/-SNAPSHOT//')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
       - name: Prepare Maven Release
-        run: mvn -B release:prepare -DautoVersionSubmodules=true -DpushChanges=true -DreleaseVersion=${{ steps.get_version.outputs.version }} -DdevelopmentVersion=${{ steps.get_version.outputs.version }}-SNAPSHOT -Dtag=v${{ steps.get_version.outputs.version }} --settings .github/maven-settings.xml
+        run: mvn -B release:prepare -DautoVersionSubmodules=true -DpushChanges=true --settings .github/maven-settings.xml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Perform Maven Release
@@ -52,10 +52,15 @@ jobs:
             --title "Release v${{ steps.get_version.outputs.version }}" \
             --notes-file ${{ steps.release_notes.outputs.notes_path }} \
             --target main \
-            target/*.jar # Attach the built JAR as an asset
+            target/*.jar # Attach the built JAR
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Deploy to Heroku
+        run: |
+          heroku git:remote -a test-heroku-dhule # Replace with your Heroku app name
+          git push heroku main
+        env:
+          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
     permissions:
       contents: write # Allow pushing commits, tags, and creating releases
       packages: write # Allow publishing to GitHub Packages
-      
